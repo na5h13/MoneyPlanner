@@ -62,5 +62,7 @@ __pycache__/
 *.egg-info/
 .venv/
 venv/
-backend/data/
-backend/exports/
+backend/data/*
+!backend/data/.gitkeep
+backend/exports/*
+!backend/exports/.gitkeep
