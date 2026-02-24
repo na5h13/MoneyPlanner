@@ -1,0 +1,28 @@
+{
+  "cli": {
+    "version": ">= 12.0.0"
+  },
+  "build": {
+    "development": {
+      "developmentClient": true,
+      "distribution": "internal",
+      "env": {
+        "PLAID_ENV": "sandbox"
+      }
+    },
+    "preview": {
+      "distribution": "internal",
+      "env": {
+        "PLAID_ENV": "development"
+      }
+    },
+    "production": {
+      "env": {
+        "PLAID_ENV": "production"
+      }
+    }
+  },
+  "submit": {
+    "production": {}
+  }
+}

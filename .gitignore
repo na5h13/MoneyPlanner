@@ -1,0 +1,55 @@
+# Dependencies
+node_modules/
+backend/node_modules/
+
+# Environment variables (NEVER commit these)
+.env
+.env.local
+.env.production
+backend/.env
+backend/.env.local
+backend/.env.production
+
+# Firebase service account keys
+**/serviceAccountKey.json
+**/google-services.json
+**/GoogleService-Info.plist
+
+# Expo
+.expo/
+dist/
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+*.orig.*
+
+# Native builds
+ios/
+android/
+
+# Metro
+.metro-health-check*
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Testing
+coverage/
+
+# Build outputs
+build/
+backend/dist/
+
+# Logs
+*.log
+npm-debug.log*
