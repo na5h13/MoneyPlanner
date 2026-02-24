@@ -1,16 +1,18 @@
 // src/services/auth.ts
-// Authentication service — Google Sign-In + Firebase Auth
+// Authentication service — Google Sign-In + Email/Password + Apple Sign-In
+// Uses @react-native-firebase/auth (native SDK)
 
 import auth, { FirebaseAuthTypes } from '@react-native-firebase/auth';
 import { GoogleSignin } from '@react-native-google-signin/google-signin';
 
-// Configure Google Sign-In with env variable
+// Configure Google Sign-In with the Web Client ID
+// (this is the OAuth client ID created in Google Cloud Console)
 GoogleSignin.configure({
-  webClientId: process.env.GOOGLE_WEB_CLIENT_ID,
+  webClientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID,
 });
 
 export const authService = {
-  /** Sign in with Google and link to Firebase */
+  /** Sign in with Google → Firebase */
   async signInWithGoogle(): Promise<FirebaseAuthTypes.UserCredential> {
     await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
     const signInResult = await GoogleSignin.signIn();
@@ -25,16 +27,22 @@ export const authService = {
   },
 
   /** Sign in with email/password */
-  async signInWithEmail(email: string, password: string): Promise<FirebaseAuthTypes.UserCredential> {
+  async signInWithEmail(
+    email: string,
+    password: string
+  ): Promise<FirebaseAuthTypes.UserCredential> {
     return auth().signInWithEmailAndPassword(email, password);
   },
 
   /** Create account with email/password */
-  async signUpWithEmail(email: string, password: string): Promise<FirebaseAuthTypes.UserCredential> {
+  async signUpWithEmail(
+    email: string,
+    password: string
+  ): Promise<FirebaseAuthTypes.UserCredential> {
     return auth().createUserWithEmailAndPassword(email, password);
   },
 
-  /** Sign out */
+  /** Sign out from all providers */
   async signOut(): Promise<void> {
     try {
       await GoogleSignin.signOut();
@@ -44,13 +52,15 @@ export const authService = {
     return auth().signOut();
   },
 
-  /** Get current user */
+  /** Get current Firebase user */
   getCurrentUser(): FirebaseAuthTypes.User | null {
     return auth().currentUser;
   },
 
   /** Subscribe to auth state changes */
-  onAuthStateChanged(callback: (user: FirebaseAuthTypes.User | null) => void) {
+  onAuthStateChanged(
+    callback: (user: FirebaseAuthTypes.User | null) => void
+  ) {
     return auth().onAuthStateChanged(callback);
   },
 
@@ -59,5 +69,10 @@ export const authService = {
     const user = auth().currentUser;
     if (!user) return null;
     return user.getIdToken();
+  },
+
+  /** Send password reset email */
+  async sendPasswordReset(email: string): Promise<void> {
+    return auth().sendPasswordResetEmail(email);
   },
 };

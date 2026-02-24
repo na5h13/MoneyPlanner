@@ -1,26 +1,19 @@
 // src/services/firebase.ts
-// Firebase initialization using environment variables
-// All values come from .env — no hardcoded secrets
+// Firebase initialization for React Native
+//
+// @react-native-firebase/app reads config automatically from:
+//   - Android: google-services.json (in project root, copied by EAS Build)
+//   - iOS: GoogleService-Info.plist (in project root, copied by EAS Build)
+//
+// No env vars needed here — native SDKs handle it.
+// The EXPO_PUBLIC_FIREBASE_* vars are for web fallback only.
 
-import { initializeApp, getApps, getApp, FirebaseApp } from '@react-native-firebase/app';
+import { firebase } from '@react-native-firebase/app';
 
-const firebaseConfig = {
-  apiKey: process.env.FIREBASE_API_KEY,
-  authDomain: process.env.FIREBASE_AUTH_DOMAIN,
-  projectId: process.env.FIREBASE_PROJECT_ID,
-  storageBucket: process.env.FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: process.env.FIREBASE_MESSAGING_SENDER_ID,
-  appId: process.env.FIREBASE_APP_ID,
-  measurementId: process.env.FIREBASE_MEASUREMENT_ID,
-};
-
-let app: FirebaseApp;
-
-if (getApps().length === 0) {
-  app = initializeApp(firebaseConfig);
-} else {
-  app = getApp();
+// Verify Firebase is initialized (native SDK does this automatically)
+if (!firebase.apps.length) {
+  console.warn('Firebase not auto-initialized — check google-services.json / GoogleService-Info.plist');
 }
 
-export { app };
-export default app;
+export const firebaseApp = firebase.app();
+export default firebaseApp;

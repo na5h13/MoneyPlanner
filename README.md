@@ -1,105 +1,101 @@
 # MoneyPlanner
 
-Automation-first budgeting app with Income Increase Neutralization (IIN). Built with the philosophy that **less interaction with money management = better financial health**.
+Automation-first budgeting app with Income Increase Neutralization (IIN).
+
+**Core principle:** Less interaction with your money = healthier finances. MoneyPlanner automates budgeting through bank connections and intelligently redirects income increases before lifestyle inflation takes hold.
 
 ## Architecture
 
 ```
-MoneyPlanner/
-├── app/                    # Expo Router screens
-│   ├── (auth)/             # Login, onboarding
-│   ├── (tabs)/             # Main app: Home, Budget, IIN, Settings
-│   └── (modals)/           # Connect bank, IIN setup/review
-├── src/
-│   ├── components/         # UI components (glassmorphism design system)
-│   ├── services/           # Firebase, Auth, Plaid, API client
-│   ├── stores/             # Zustand state (auth, budget, IIN)
-│   ├── hooks/              # Custom React hooks
-│   ├── theme/              # Design tokens (green-only palette, glass effects)
-│   ├── types/              # TypeScript interfaces
-│   ├── utils/              # Helpers
-│   └── constants/          # App constants
-├── backend/                # Railway-deployed Express API
-│   └── src/
-│       ├── routes/         # Plaid, IIN endpoints
-│       ├── middleware/      # Firebase auth verification
-│       ├── services/       # Plaid client, Firebase Admin
-│       └── utils/          # Encryption
-└── assets/                 # App icons, splash screen
+┌─────────────────────┐      ┌────────────────────┐
+│   React Native Expo │      │   Flask Backend     │
+│   (Mobile App)      │─────▶│   (Railway)         │
+│                     │      │                     │
+│ • Firebase Auth     │      │ • Firebase Admin    │
+│ • Plaid Link SDK    │      │ • Plaid API         │
+│ • Zustand stores    │      │ • IIN Engine        │
+│ • Glassmorphism UI  │      │ • Budget automation │
+└─────────────────────┘      └────────────────────┘
+         │                           │
+         ▼                           ▼
+  Firebase Auth               JSON persistence
+  (auth only,                 (→ PostgreSQL)
+   no Firestore)
 ```
 
 ## Tech Stack
 
-- **Mobile**: Expo (React Native) → iOS, Android, Web
-- **State**: Zustand
-- **Auth**: Firebase Auth + Google Sign-In
-- **Database**: Firestore
-- **Banking**: Plaid (transactions, income detection)
-- **Backend**: Express on Railway
-- **Design**: Glassmorphism, green-only color scheme, dark theme
+**Frontend:** React Native + Expo SDK 52, TypeScript, Zustand, expo-router
+**Backend:** Flask + Python 3.12, gunicorn, plaid-python, firebase-admin
+**Auth:** Firebase Authentication (Google, Email/Password, Apple)
+**Banking:** Plaid (sandbox → production)
+**Deploy:** Railway (backend), EAS Build (mobile)
 
-## Setup
+## Quick Start
 
-### 1. Clone and install
-
+### 1. Clone & Install
 ```bash
 git clone https://github.com/na5h13/MoneyPlanner.git
 cd MoneyPlanner
 npm install
-cd backend && npm install && cd ..
 ```
 
-### 2. Configure environment variables
-
+### 2. Backend Setup
 ```bash
+cd backend
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
 cp .env.example .env
-cp backend/.env.example backend/.env
+# Fill in PLAID_CLIENT_ID, PLAID_SECRET, ENCRYPTION_KEY
+# Place firebase-service-account.json in backend/config/
+python app.py
 ```
 
-Fill in both `.env` files — see comments in each file for where to find each value.
-
-### 3. Firebase setup
-
-- Place `google-services.json` (Android) in project root
-- Place `GoogleService-Info.plist` (iOS) in project root
-- Place `serviceAccountKey.json` in `backend/`
-- All three files are gitignored
-
-### 4. Run
-
+### 3. Frontend Setup
 ```bash
-# Mobile app
-npm run dev
-
-# Backend (separate terminal)
-cd backend && npm run dev
+# In project root
+cp .env.example .env
+# Fill in EXPO_PUBLIC_* values
+npx expo start
 ```
 
-## Environment Variables Checklist
+### 4. Railway Deploy
+```bash
+# Push to GitHub → Railway auto-deploys
+# Set environment variables in Railway dashboard:
+# PLAID_CLIENT_ID, PLAID_SECRET, PLAID_ENV,
+# FIREBASE_SERVICE_ACCOUNT_JSON (paste entire JSON),
+# FIREBASE_PROJECT_ID, ENCRYPTION_KEY, PORT
+```
 
-### App (.env)
-- [ ] `FIREBASE_API_KEY`
-- [ ] `FIREBASE_AUTH_DOMAIN`
-- [ ] `FIREBASE_PROJECT_ID`
-- [ ] `FIREBASE_STORAGE_BUCKET`
-- [ ] `FIREBASE_MESSAGING_SENDER_ID`
-- [ ] `FIREBASE_APP_ID`
-- [ ] `GOOGLE_WEB_CLIENT_ID`
-- [ ] `GOOGLE_ANDROID_CLIENT_ID`
-- [ ] `GOOGLE_IOS_CLIENT_ID`
-- [ ] `PLAID_ENV`
-- [ ] `API_BASE_URL`
+## Project Structure
 
-### Backend (backend/.env)
-- [ ] `FIREBASE_PROJECT_ID`
-- [ ] `FIREBASE_SERVICE_ACCOUNT_KEY_PATH` or `FIREBASE_SERVICE_ACCOUNT_KEY_BASE64`
-- [ ] `PLAID_CLIENT_ID`
-- [ ] `PLAID_SECRET`
-- [ ] `PLAID_ENV`
-- [ ] `PLAID_WEBHOOK_URL`
-- [ ] `ENCRYPTION_KEY` (generate: `openssl rand -hex 32`)
+```
+MoneyPlanner/
+├── app/                    # Expo Router screens
+│   ├── (auth)/            # Login, onboarding
+│   ├── (tabs)/            # Dashboard, budget, IIN, settings
+│   └── (modals)/          # Connect bank, IIN setup/review
+├── src/
+│   ├── services/          # API clients (auth, plaid, iin, budget)
+│   ├── stores/            # Zustand state management
+│   ├── components/        # UI components
+│   ├── theme/             # Glassmorphism design system
+│   └── types/             # TypeScript interfaces
+├── backend/               # Flask API (deployed to Railway)
+│   ├── app.py             # Main app with all routes
+│   ├── models/            # Data models
+│   ├── services/          # Business logic
+│   └── config/            # Firebase service account (gitignored)
+├── railway.json           # Railway deployment config
+└── nixpacks.toml          # Railway build config
+```
 
-### Firebase files
-- [ ] `google-services.json` (root)
-- [ ] `GoogleService-Info.plist` (root)
-- [ ] `serviceAccountKey.json` (backend/)
+## Key Features
+
+- **IIN (Income Increase Neutralization):** Automatically detects income changes and proposes savings rate adjustments to prevent lifestyle inflation
+- **Automation-first:** Bank connections via Plaid auto-categorize spending — minimal manual input
+- **Green-only UI:** Glassmorphism dark theme with green accents — less red/yellow anxiety
+- **Phase-based onboarding:** Onboarding → Observation → Budget → Automation → Optimization
+- **Dev mode:** `DEV_MODE=true` bypasses Firebase auth and accelerates phase timing for rapid development
