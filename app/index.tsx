@@ -1,18 +1,24 @@
 // app/index.tsx
-// Entry point — redirects to auth or main app based on state
+// Entry point — DEV_MODE goes straight to tabs, production checks auth.
 
 import { Redirect } from 'expo-router';
 import { useAuthStore } from '@/src/stores/authStore';
 import { View, ActivityIndicator } from 'react-native';
 import { colors } from '@/src/theme';
 
+const DEV_MODE = process.env.EXPO_PUBLIC_DEV_MODE === 'true';
+
 export default function Index() {
-  const { isAuthenticated, isLoading, isOnboarded } = useAuthStore();
+  const { isAuthenticated, isLoading } = useAuthStore();
+
+  if (DEV_MODE) {
+    return <Redirect href="/(tabs)/budget" />;
+  }
 
   if (isLoading) {
     return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.bg.primary }}>
-        <ActivityIndicator size="large" color={colors.green[500]} />
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.bg.eggshell }}>
+        <ActivityIndicator size="large" color={colors.brand.deepSage} />
       </View>
     );
   }
@@ -21,9 +27,5 @@ export default function Index() {
     return <Redirect href="/(auth)/login" />;
   }
 
-  if (!isOnboarded) {
-    return <Redirect href="/(auth)/onboarding" />;
-  }
-
-  return <Redirect href="/(tabs)" />;
+  return <Redirect href="/(tabs)/budget" />;
 }

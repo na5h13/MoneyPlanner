@@ -1,5 +1,7 @@
 // app/_layout.tsx
-// Root layout — wraps the entire app with auth state listener and theme
+// Root layout.
+// DEV_MODE=true → skip Firebase auth entirely, go straight to tabs.
+// Production → Firebase auth listener gates access.
 
 import { useEffect } from 'react';
 import { Stack } from 'expo-router';
@@ -9,24 +11,44 @@ import { useAuthStore } from '@/src/stores/authStore';
 import { authService } from '@/src/services/auth';
 import { colors } from '@/src/theme';
 
-// Keep splash screen visible while we check auth
 SplashScreen.preventAutoHideAsync();
+
+const DEV_MODE = process.env.EXPO_PUBLIC_DEV_MODE === 'true';
 
 export default function RootLayout() {
   const { setUser, setLoading } = useAuthStore();
 
   useEffect(() => {
-    // Listen for Firebase auth state changes
+    if (DEV_MODE) {
+      // Skip Firebase entirely in dev — go straight to app
+      setUser({
+        uid: 'dev-user',
+        email: 'dev@keel.app',
+        displayName: 'Dev User',
+        photoURL: null,
+        createdAt: new Date().toISOString(),
+        onboardingComplete: true,
+        settings: {
+          currency: 'CAD',
+          notificationsEnabled: true,
+          automationLevel: 'full',
+          incomeCheckFrequency: 'monthly',
+        },
+      });
+      setLoading(false);
+      SplashScreen.hideAsync();
+      return;
+    }
+
     const unsubscribe = authService.onAuthStateChanged(async (firebaseUser) => {
       if (firebaseUser) {
-        // TODO: Fetch full UserProfile from Firestore
         setUser({
           uid: firebaseUser.uid,
           email: firebaseUser.email || '',
           displayName: firebaseUser.displayName,
           photoURL: firebaseUser.photoURL,
           createdAt: firebaseUser.metadata.creationTime || new Date().toISOString(),
-          onboardingComplete: false, // Will be fetched from Firestore
+          onboardingComplete: true,
           settings: {
             currency: 'CAD',
             notificationsEnabled: true,
