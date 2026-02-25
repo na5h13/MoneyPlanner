@@ -30,9 +30,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Write .env for build
+      - name: Write .env
         run: |
-          cat << ENVEOF > .env
+          cat > .env << ENVEOF
           EXPO_PUBLIC_FIREBASE_API_KEY=${{ secrets.EXPO_PUBLIC_FIREBASE_API_KEY }}
           EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN=${{ secrets.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN }}
           EXPO_PUBLIC_FIREBASE_PROJECT_ID=${{ secrets.EXPO_PUBLIC_FIREBASE_PROJECT_ID }}
@@ -47,15 +47,15 @@ jobs:
           EXPO_PUBLIC_DEV_MODE=true
           ENVEOF
 
-      - name: Expo prebuild (no dev client)
-        run: npx expo prebuild --platform android --no-install
-        env:
-          NODE_ENV: production
+      - name: Write google-services.json
+        run: echo '${{ secrets.GOOGLE_SERVICES_JSON }}' > google-services.json
 
-      - name: Generate release keystore
+      - name: Expo prebuild
+        run: npx expo prebuild --platform android --no-install
+
+      - name: Generate keystore
         run: |
           keytool -genkeypair \
-            -v \
             -keystore android/app/release.keystore \
             -alias keel \
             -keyalg RSA \
@@ -63,38 +63,66 @@ jobs:
             -validity 10000 \
             -storepass keel_release_2024 \
             -keypass keel_release_2024 \
-            -dname "CN=Keel, OU=Mobile, O=na5h13, L=Toronto, S=ON, C=CA"
+            -dname "CN=Keel,OU=Mobile,O=na5h13,L=Toronto,S=ON,C=CA" \
+            -noprompt
 
-      - name: Configure release signing
+      - name: Configure signing in gradle.properties
         run: |
-          cat >> android/app/build.gradle << 'GRADLE'
+          cat >> android/gradle.properties << 'EOF'
+          MYAPP_UPLOAD_STORE_FILE=release.keystore
+          MYAPP_UPLOAD_KEY_ALIAS=keel
+          MYAPP_UPLOAD_STORE_PASSWORD=keel_release_2024
+          MYAPP_UPLOAD_KEY_PASSWORD=keel_release_2024
+          EOF
 
-          android {
+      - name: Patch build.gradle for signing
+        run: |
+          python3 << 'PYEOF'
+          import re
+
+          with open('android/app/build.gradle', 'r') as f:
+              content = f.read()
+
+          signing_config = """
               signingConfigs {
                   release {
-                      storeFile file("release.keystore")
-                      storePassword "keel_release_2024"
-                      keyAlias "keel"
-                      keyPassword "keel_release_2024"
+                      storeFile file(MYAPP_UPLOAD_STORE_FILE)
+                      storePassword MYAPP_UPLOAD_STORE_PASSWORD
+                      keyAlias MYAPP_UPLOAD_KEY_ALIAS
+                      keyPassword MYAPP_UPLOAD_KEY_PASSWORD
                   }
               }
-              buildTypes {
-                  release {
-                      signingConfig signingConfigs.release
-                      minifyEnabled false
-                      shrinkResources false
-                  }
-              }
-          }
-          GRADLE
+          """
 
-      - name: Bundle JS into APK (release)
+          # Insert signingConfigs before buildTypes
+          if 'signingConfigs' not in content:
+              content = content.replace(
+                  '    buildTypes {',
+                  signing_config + '    buildTypes {',
+                  1
+              )
+
+          # Set release buildType to use signing config
+          content = re.sub(
+              r'(release\s*\{[^}]*?)(minifyEnabled\s+\w+)',
+              r'\1signingConfig signingConfigs.release\n            \2',
+              content,
+              count=1
+          )
+
+          with open('android/app/build.gradle', 'w') as f:
+              f.write(content)
+
+          print("build.gradle patched successfully")
+          PYEOF
+
+      - name: Build release APK
         working-directory: android
         run: ./gradlew assembleRelease --no-daemon
         env:
           NODE_ENV: production
 
-      - name: Upload Release APK
+      - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: keel-release

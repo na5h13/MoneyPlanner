@@ -1,27 +1,38 @@
 // app/(tabs)/index.tsx
-// Home Dashboard — Phase 4 primary screen.
-// Safe-to-spend hero, goal bullets, category bars, 7-day lookahead.
-// "The less you see here, the healthier your finances."
+// Home Dashboard — real data only.
+// No hardcoded amounts, no mock categories, no fake stats.
+// Failed fetch = visible error.
 
 import React, { useState, useEffect } from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
-  ActivityIndicator,
+  View, Text, StyleSheet, ScrollView, RefreshControl, ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { colors, spacing, typography, borderRadius, shadows } from '@/src/theme';
+import { colors, spacing, typography, borderRadius } from '@/src/theme';
 import { GlassCard } from '@/src/components/ui/GlassCard';
+import { ErrorState } from '@/src/components/ui/ErrorState';
 import { budgetService } from '@/src/services/budget';
 import { useAuthStore } from '@/src/stores/authStore';
 
+interface DashboardData {
+  safeToSpend: number;
+  monthlyIncome: number;
+  monthSpending: number;
+  fixedExpenses: number;
+  daysRemaining: number;
+  envelopes: Array<{
+    name: string;
+    total: number;
+    monthly_avg: number;
+  }>;
+}
+
 export default function HomeScreen() {
   const { user } = useAuthStore();
-  const [safeToSpend, setSafeToSpend] = useState<number | null>(null);
+  const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [greeting, setGreeting] = useState('');
 
   useEffect(() => {
@@ -29,92 +40,153 @@ export default function HomeScreen() {
     if (hour < 12) setGreeting('Good morning');
     else if (hour < 17) setGreeting('Good afternoon');
     else setGreeting('Good evening');
-
-    budgetService.getSafeToSpend()
-      .then((d) => setSafeToSpend(d.safe_to_spend))
-      .catch(() => setSafeToSpend(847))
-      .finally(() => setLoading(false));
   }, []);
+
+  async function fetchData(showRefresh = false) {
+    if (showRefresh) setRefreshing(true);
+    else setLoading(true);
+    setError(null);
+
+    try {
+      const [sts, summary] = await Promise.all([
+        budgetService.getSafeToSpend(),
+        budgetService.getSummary(),
+      ]);
+
+      setData({
+        safeToSpend: sts.safe_to_spend,
+        monthlyIncome: sts.monthly_income,
+        monthSpending: sts.month_spending,
+        fixedExpenses: sts.fixed_expenses,
+        daysRemaining: sts.days_remaining,
+        envelopes: summary.envelopes?.map((e: any) => ({
+          name: e.name,
+          total: e.subtotal,
+          monthly_avg: e.categories?.reduce((s: number, c: any) => s + (c.monthly_avg || 0), 0) || 0,
+        })) || [],
+      });
+    } catch (e: any) {
+      setError(e?.message || String(e));
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }
+
+  useEffect(() => { fetchData(); }, []);
 
   const firstName = user?.displayName?.split(' ')[0] || '';
 
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.safe} edges={['top']}>
+        <View style={styles.center}>
+          <ActivityIndicator color={colors.brand.deepSage} size="large" />
+          <Text style={styles.loadingText}>Loading dashboard…</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (error) {
+    return (
+      <SafeAreaView style={styles.safe} edges={['top']}>
+        <ErrorState
+          error={error}
+          context="GET /api/safe-to-spend + /api/budget/summary"
+          onRetry={() => fetchData()}
+        />
+      </SafeAreaView>
+    );
+  }
+
+  const isPositive = (data?.safeToSpend ?? 0) >= 0;
+  const savingsRate = data && data.monthlyIncome > 0
+    ? Math.round(((data.monthlyIncome - data.monthSpending) / data.monthlyIncome) * 100)
+    : null;
+
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
-      <ScrollView showsVerticalScrollIndicator={false}>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={() => fetchData(true)}
+            tintColor={colors.brand.deepSage}
+          />
+        }
+      >
         {/* Header */}
         <View style={styles.header}>
-          <Text style={styles.greeting}>
-            {greeting}{firstName ? `, ${firstName}` : ''}
-          </Text>
+          <Text style={styles.greeting}>{greeting}{firstName ? `, ${firstName}` : ''}</Text>
           <Text style={styles.date}>
             {new Date().toLocaleDateString('en-CA', { weekday: 'long', month: 'long', day: 'numeric' })}
           </Text>
         </View>
 
         {/* Safe-to-spend hero */}
-        <GlassCard
-          tier="strong"
-          style={styles.heroCard}
-          surplusGlow={(safeToSpend ?? 0) > 0}
-        >
+        <GlassCard tier="strong" style={styles.heroCard} surplusGlow={isPositive}>
           <View style={styles.automationBadge}>
-            <Text style={styles.automationBadgeText}>● Automated</Text>
+            <Text style={styles.automationBadgeText}>● Live</Text>
           </View>
-          {loading ? (
-            <ActivityIndicator color={colors.brand.deepSage} size="large" />
-          ) : (
-            <>
-              <Text style={styles.heroLabel}>Safe to Spend Today</Text>
-              <Text style={[
-                styles.heroAmount,
-                (safeToSpend ?? 0) >= 0 ? styles.surplus : styles.deficit,
-              ]}>
-                ${Math.abs(safeToSpend ?? 0).toFixed(0)}
-              </Text>
-              <Text style={styles.heroSub}>
-                {(safeToSpend ?? 0) >= 0
-                  ? 'Your finances are on track'
-                  : 'Consider adjusting spending'}
-              </Text>
-            </>
-          )}
+          <Text style={styles.heroLabel}>Safe to Spend</Text>
+          <Text style={[styles.heroAmount, isPositive ? styles.surplus : styles.deficit]}>
+            {isPositive ? '' : '-'}${Math.abs(data?.safeToSpend ?? 0).toLocaleString('en-CA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+          </Text>
+          <Text style={styles.heroSub}>
+            {data && data.daysRemaining > 0 ? `${data.daysRemaining} days remaining this period` : 'End of period'}
+          </Text>
         </GlassCard>
 
-        {/* Quick stats */}
-        <View style={styles.statsRow}>
-          <StatCard label="This Month" value="$2,140" sublabel="spent" color={colors.data.neutral} />
-          <StatCard label="Savings Rate" value="18%" sublabel="of income" color={colors.data.positiveLight} />
-          <StatCard label="Streak" value="23d" sublabel="on budget" color={colors.data.surplus} />
-        </View>
+        {/* Stats */}
+        {data && (
+          <View style={styles.statsRow}>
+            <StatCard
+              label="Income"
+              value={`$${(data.monthlyIncome / 1000).toFixed(1)}k`}
+              sublabel="this month"
+              color={colors.data.surplus}
+            />
+            <StatCard
+              label="Spent"
+              value={`$${(data.monthSpending / 1000).toFixed(1)}k`}
+              sublabel="this month"
+              color={colors.data.neutral}
+            />
+            {savingsRate !== null && (
+              <StatCard
+                label="Savings"
+                value={`${savingsRate}%`}
+                sublabel="of income"
+                color={savingsRate >= 20 ? colors.data.surplus : savingsRate >= 10 ? colors.data.positiveLight : colors.data.warning}
+              />
+            )}
+          </View>
+        )}
 
-        {/* Category health bars */}
-        <Text style={styles.sectionTitle}>Category Health</Text>
-        <GlassCard style={styles.healthCard}>
-          {MOCK_CATEGORIES.map((cat, idx) => (
-            <React.Fragment key={cat.name}>
-              <CategoryBar {...cat} />
-              {idx < MOCK_CATEGORIES.length - 1 && <View style={styles.divider} />}
-            </React.Fragment>
-          ))}
-        </GlassCard>
-
-        {/* Upcoming */}
-        <Text style={styles.sectionTitle}>Coming Up</Text>
-        <GlassCard style={styles.upcomingCard}>
-          {MOCK_UPCOMING.map((item, idx) => (
-            <React.Fragment key={item.name}>
-              <View style={styles.upcomingRow}>
-                <Text style={styles.upcomingIcon}>{item.icon}</Text>
-                <View style={styles.upcomingInfo}>
-                  <Text style={styles.upcomingName}>{item.name}</Text>
-                  <Text style={styles.upcomingDate}>{item.date}</Text>
-                </View>
-                <Text style={styles.upcomingAmount}>${item.amount}</Text>
-              </View>
-              {idx < MOCK_UPCOMING.length - 1 && <View style={styles.divider} />}
-            </React.Fragment>
-          ))}
-        </GlassCard>
+        {/* Envelope breakdown */}
+        {data && data.envelopes.length > 0 && (
+          <>
+            <Text style={styles.sectionTitle}>Spending by Category</Text>
+            <GlassCard style={styles.envelopeCard}>
+              {data.envelopes
+                .filter(e => e.name !== 'Income')
+                .sort((a, b) => b.total - a.total)
+                .slice(0, 6)
+                .map((env, idx, arr) => (
+                  <React.Fragment key={env.name}>
+                    <EnvelopeRow
+                      name={env.name}
+                      spent={env.total}
+                      budget={env.monthly_avg}
+                    />
+                    {idx < arr.length - 1 && <View style={styles.divider} />}
+                  </React.Fragment>
+                ))}
+            </GlassCard>
+          </>
+        )}
 
         <View style={{ height: 40 }} />
       </ScrollView>
@@ -122,7 +194,9 @@ export default function HomeScreen() {
   );
 }
 
-function StatCard({ label, value, sublabel, color }: { label: string; value: string; sublabel: string; color: string }) {
+function StatCard({ label, value, sublabel, color }: {
+  label: string; value: string; sublabel: string; color: string;
+}) {
   return (
     <GlassCard tier="inset" style={styles.statCard} shadow="none">
       <Text style={styles.statLabel}>{label}</Text>
@@ -132,198 +206,84 @@ function StatCard({ label, value, sublabel, color }: { label: string; value: str
   );
 }
 
-function CategoryBar({ name, spent, budget, icon }: { name: string; spent: number; budget: number; icon: string }) {
-  const pct = Math.min(spent / budget, 1);
-  const over = spent > budget;
+function EnvelopeRow({ name, spent, budget }: { name: string; spent: number; budget: number }) {
+  const pct = budget > 0 ? Math.min(spent / budget, 1) : 0;
+  const over = budget > 0 && spent > budget;
   const barColor = over ? colors.data.warning : colors.data.surplus;
 
   return (
-    <View style={styles.catRow}>
-      <Text style={styles.catIcon}>{icon}</Text>
-      <View style={styles.catInfo}>
-        <View style={styles.catLabelRow}>
-          <Text style={styles.catName}>{name}</Text>
-          <Text style={[styles.catAmt, over && { color: colors.data.warning }]}>
-            ${spent} / ${budget}
+    <View style={styles.envRow}>
+      <View style={styles.envInfo}>
+        <View style={styles.envLabelRow}>
+          <Text style={styles.envName}>{name}</Text>
+          <Text style={[styles.envAmt, over && { color: colors.data.warning }]}>
+            ${spent.toFixed(0)}{budget > 0 ? ` / $${budget.toFixed(0)}` : ''}
           </Text>
         </View>
-        <View style={styles.catBarBg}>
-          <View style={[styles.catBarFill, { width: `${pct * 100}%`, backgroundColor: barColor }]} />
-        </View>
+        {budget > 0 && (
+          <View style={styles.envBarBg}>
+            <View style={[styles.envBarFill, { width: `${pct * 100}%`, backgroundColor: barColor }]} />
+          </View>
+        )}
       </View>
     </View>
   );
 }
 
-const MOCK_CATEGORIES = [
-  { name: 'Food', spent: 387, budget: 550, icon: '🛒' },
-  { name: 'Transport', spent: 156, budget: 196, icon: '🚌' },
-  { name: 'Bills', spent: 163, budget: 163, icon: '📱' },
-  { name: 'Entertainment', spent: 68, budget: 100, icon: '🎬' },
-];
-
-const MOCK_UPCOMING = [
-  { name: 'Rent', date: 'Mar 1', amount: '1,800', icon: '🏠' },
-  { name: 'Phone bill', date: 'Mar 3', amount: '70', icon: '📱' },
-  { name: 'Netflix', date: 'Mar 7', amount: '16', icon: '🎬' },
-];
-
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.bg.eggshell },
-  header: {
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.md,
-    paddingBottom: spacing.lg,
-  },
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing.md },
+  loadingText: { fontSize: typography.size.base, color: colors.data.neutral },
+  header: { paddingHorizontal: spacing.lg, paddingTop: spacing.md, paddingBottom: spacing.lg },
   greeting: {
-    fontSize: typography.size['2xl'],
-    fontWeight: '700',
-    color: colors.text.primary,
-    fontFamily: typography.fontFamily.display,
-    letterSpacing: -0.5,
+    fontSize: typography.size['2xl'], fontWeight: '700', color: colors.text.primary,
+    fontFamily: typography.fontFamily.display, letterSpacing: -0.5,
   },
-  date: {
-    fontSize: typography.size.sm,
-    color: colors.data.neutral,
-    marginTop: 4,
-  },
+  date: { fontSize: typography.size.sm, color: colors.data.neutral, marginTop: 4 },
   heroCard: {
-    marginHorizontal: spacing.lg,
-    marginBottom: spacing.md,
-    alignItems: 'center',
-    paddingVertical: spacing.xl,
-    paddingHorizontal: spacing.lg,
+    marginHorizontal: spacing.lg, marginBottom: spacing.md,
+    alignItems: 'center', paddingVertical: spacing.xl, paddingHorizontal: spacing.lg,
   },
   automationBadge: {
-    position: 'absolute',
-    top: spacing.md,
-    right: spacing.md,
-    backgroundColor: 'rgba(91,138,114,0.15)',
-    borderRadius: 99,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
+    position: 'absolute', top: spacing.md, right: spacing.md,
+    backgroundColor: 'rgba(91,138,114,0.15)', borderRadius: 99,
+    paddingHorizontal: 10, paddingVertical: 4,
   },
-  automationBadgeText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: colors.data.surplus,
-  },
+  automationBadgeText: { fontSize: 11, fontWeight: '700', color: colors.data.surplus },
   heroLabel: {
-    fontSize: typography.size.sm,
-    fontWeight: '700',
-    color: colors.data.neutral,
-    textTransform: 'uppercase',
-    letterSpacing: 1,
-    marginBottom: 8,
+    fontSize: typography.size.sm, fontWeight: '700', color: colors.data.neutral,
+    textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8,
   },
   heroAmount: {
-    fontSize: 56,
-    fontWeight: '700',
-    fontFamily: typography.fontFamily.mono,
-    letterSpacing: -3,
-    marginBottom: 6,
+    fontSize: 52, fontWeight: '700', fontFamily: typography.fontFamily.mono,
+    letterSpacing: -2, marginBottom: 6,
   },
   surplus: { color: colors.data.surplus },
   deficit: { color: colors.data.deficit },
-  heroSub: {
-    fontSize: typography.size.sm,
-    color: colors.data.neutral,
-  },
+  heroSub: { fontSize: typography.size.sm, color: colors.data.neutral },
   statsRow: {
-    flexDirection: 'row',
-    paddingHorizontal: spacing.lg,
-    gap: spacing.sm,
-    marginBottom: spacing.lg,
+    flexDirection: 'row', paddingHorizontal: spacing.lg,
+    gap: spacing.sm, marginBottom: spacing.lg,
   },
-  statCard: {
-    flex: 1,
-    alignItems: 'center',
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.sm,
-  },
+  statCard: { flex: 1, alignItems: 'center', paddingVertical: spacing.md, paddingHorizontal: spacing.sm },
   statLabel: {
-    fontSize: 10,
-    fontWeight: '600',
-    color: colors.data.neutral,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    marginBottom: 4,
+    fontSize: 10, fontWeight: '600', color: colors.data.neutral,
+    textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4,
   },
-  statValue: {
-    fontSize: typography.size.lg,
-    fontWeight: '700',
-    fontFamily: typography.fontFamily.mono,
-    marginBottom: 2,
-  },
-  statSub: {
-    fontSize: 10,
-    color: colors.data.neutral,
-  },
+  statValue: { fontSize: typography.size.lg, fontWeight: '700', fontFamily: typography.fontFamily.mono, marginBottom: 2 },
+  statSub: { fontSize: 10, color: colors.data.neutral },
   sectionTitle: {
-    fontSize: typography.size.sm,
-    fontWeight: '700',
-    color: colors.data.neutral,
-    textTransform: 'uppercase',
-    letterSpacing: 1,
-    paddingHorizontal: spacing.lg,
-    marginBottom: spacing.sm,
+    fontSize: typography.size.sm, fontWeight: '700', color: colors.data.neutral,
+    textTransform: 'uppercase', letterSpacing: 1,
+    paddingHorizontal: spacing.lg, marginBottom: spacing.sm,
   },
-  healthCard: {
-    marginHorizontal: spacing.lg,
-    marginBottom: spacing.lg,
-    paddingVertical: spacing.sm,
-  },
-  catRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: spacing.md,
-    paddingVertical: 10,
-    gap: spacing.sm,
-  },
-  catIcon: { fontSize: 18, width: 24, textAlign: 'center' },
-  catInfo: { flex: 1, gap: 6 },
-  catLabelRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  catName: { fontSize: typography.size.sm, fontWeight: '600', color: colors.text.primary },
-  catAmt: { fontSize: typography.size.sm, fontFamily: typography.fontFamily.mono, color: colors.data.neutral },
-  catBarBg: {
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: colors.brand.softTaupe,
-    overflow: 'hidden',
-  },
-  catBarFill: {
-    height: 4,
-    borderRadius: 2,
-  },
-  upcomingCard: {
-    marginHorizontal: spacing.lg,
-    marginBottom: spacing.md,
-    paddingVertical: spacing.xs,
-  },
-  upcomingRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: spacing.md,
-    paddingVertical: 12,
-    gap: spacing.sm,
-  },
-  upcomingIcon: { fontSize: 18 },
-  upcomingInfo: { flex: 1 },
-  upcomingName: { fontSize: typography.size.base, fontWeight: '600', color: colors.text.primary },
-  upcomingDate: { fontSize: typography.size.sm, color: colors.data.neutral },
-  upcomingAmount: {
-    fontSize: typography.size.base,
-    fontWeight: '700',
-    fontFamily: typography.fontFamily.mono,
-    color: colors.text.primary,
-  },
-  divider: {
-    height: 0.5,
-    backgroundColor: colors.brand.softTaupe,
-    marginHorizontal: spacing.md,
-    opacity: 0.5,
-  },
+  envelopeCard: { marginHorizontal: spacing.lg, marginBottom: spacing.lg, paddingVertical: spacing.sm },
+  envRow: { paddingHorizontal: spacing.md, paddingVertical: 10 },
+  envInfo: { gap: 6 },
+  envLabelRow: { flexDirection: 'row', justifyContent: 'space-between' },
+  envName: { fontSize: typography.size.sm, fontWeight: '600', color: colors.text.primary },
+  envAmt: { fontSize: typography.size.sm, fontFamily: typography.fontFamily.mono, color: colors.data.neutral },
+  envBarBg: { height: 4, borderRadius: 2, backgroundColor: colors.brand.softTaupe, overflow: 'hidden' },
+  envBarFill: { height: 4, borderRadius: 2 },
+  divider: { height: 0.5, backgroundColor: colors.brand.softTaupe, marginHorizontal: spacing.md, opacity: 0.5 },
 });

@@ -1,0 +1,1789 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MoneyPlanner — Complete Setup Guide</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=DM+Sans:wght@400;500;600;700&family=DM+Serif+Display&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #0a0f0d;
+  --bg-card: #111916;
+  --bg-card-hover: #162019;
+  --bg-input: #0d1410;
+  --border: #1e2e25;
+  --border-active: #2d9d5e;
+  --text: #e8f0eb;
+  --text-dim: #7a9685;
+  --text-muted: #4a6b58;
+  --green: #2d9d5e;
+  --green-glow: rgba(45, 157, 94, 0.15);
+  --green-bright: #3ddb7a;
+  --amber: #d4a843;
+  --amber-glow: rgba(212, 168, 67, 0.15);
+  --red: #c94a4a;
+  --red-glow: rgba(201, 74, 74, 0.1);
+  --blue: #4a8fc9;
+  --radius: 12px;
+  --radius-sm: 8px;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  font-family: 'DM Sans', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.7;
+  min-height: 100vh;
+}
+
+/* --- Scrollbar --- */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: var(--bg); }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+/* --- Layout --- */
+.container {
+  max-width: 820px;
+  margin: 0 auto;
+  padding: 40px 24px 120px;
+}
+
+/* --- Hero --- */
+.hero {
+  text-align: center;
+  padding: 60px 0 50px;
+  position: relative;
+}
+
+.hero::before {
+  content: '';
+  position: absolute;
+  top: -100px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 600px;
+  height: 400px;
+  background: radial-gradient(ellipse, var(--green-glow) 0%, transparent 70%);
+  pointer-events: none;
+}
+
+.hero h1 {
+  font-family: 'DM Serif Display', serif;
+  font-size: 3rem;
+  color: var(--text);
+  letter-spacing: -1px;
+  margin-bottom: 8px;
+  position: relative;
+}
+
+.hero h1 span { color: var(--green); }
+
+.hero .subtitle {
+  color: var(--text-dim);
+  font-size: 1.1rem;
+  margin-bottom: 24px;
+}
+
+.hero .time-estimate {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  padding: 10px 20px;
+  border-radius: 50px;
+  font-size: 0.9rem;
+  color: var(--text-dim);
+}
+
+.hero .time-estimate .clock { font-size: 1.1rem; }
+
+/* --- Progress Bar --- */
+.progress-bar-container {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  background: rgba(10, 15, 13, 0.92);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--border);
+  padding: 12px 0;
+  margin: 0 -24px;
+  padding-left: 24px;
+  padding-right: 24px;
+}
+
+.progress-bar-inner {
+  max-width: 820px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.progress-track {
+  flex: 1;
+  height: 6px;
+  background: var(--border);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--green), var(--green-bright));
+  border-radius: 3px;
+  width: 0%;
+  transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.progress-text {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.8rem;
+  color: var(--green);
+  min-width: 42px;
+  text-align: right;
+}
+
+/* --- Sections --- */
+.section {
+  margin-top: 48px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-card);
+  overflow: hidden;
+  transition: border-color 0.3s;
+}
+
+.section.completed { border-color: var(--green); }
+.section.completed .section-header { background: var(--green-glow); }
+
+.section-header {
+  padding: 20px 24px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.2s;
+}
+
+.section-header:hover { background: var(--bg-card-hover); }
+
+.section-number {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-dim);
+  flex-shrink: 0;
+  transition: all 0.3s;
+}
+
+.section.completed .section-number {
+  background: var(--green);
+  color: var(--bg);
+}
+
+.section-title {
+  flex: 1;
+  font-weight: 600;
+  font-size: 1.05rem;
+}
+
+.section-time {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.section-chevron {
+  color: var(--text-muted);
+  transition: transform 0.3s;
+  font-size: 1.2rem;
+}
+
+.section.open .section-chevron { transform: rotate(180deg); }
+
+.section-body {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.section.open .section-body { max-height: 8000px; }
+
+.section-content {
+  padding: 0 24px 24px;
+  border-top: 1px solid var(--border);
+}
+
+/* --- Steps --- */
+.step {
+  padding: 16px 0;
+  border-bottom: 1px solid rgba(30, 46, 37, 0.5);
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+}
+
+.step:last-child { border-bottom: none; }
+
+.step-check {
+  width: 22px;
+  height: 22px;
+  border: 2px solid var(--border);
+  border-radius: 6px;
+  cursor: pointer;
+  flex-shrink: 0;
+  margin-top: 2px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+  background: var(--bg-input);
+}
+
+.step-check:hover { border-color: var(--green); }
+
+.step-check.checked {
+  background: var(--green);
+  border-color: var(--green);
+}
+
+.step-check.checked::after {
+  content: '✓';
+  color: var(--bg);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.step-content { flex: 1; }
+
+.step-content p {
+  color: var(--text);
+  margin-bottom: 6px;
+}
+
+.step-content .detail {
+  color: var(--text-dim);
+  font-size: 0.9rem;
+}
+
+/* --- Code Blocks --- */
+.code-block {
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 14px 16px;
+  margin: 10px 0;
+  position: relative;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.82rem;
+  line-height: 1.8;
+  overflow-x: auto;
+  color: var(--green-bright);
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.code-block .copy-btn {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  background: var(--border);
+  border: none;
+  color: var(--text-dim);
+  padding: 4px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.7rem;
+  transition: all 0.2s;
+}
+
+.code-block .copy-btn:hover {
+  background: var(--green);
+  color: var(--bg);
+}
+
+.code-block .copy-btn.copied {
+  background: var(--green);
+  color: var(--bg);
+}
+
+/* --- Info/Warning Boxes --- */
+.info-box {
+  background: var(--green-glow);
+  border: 1px solid rgba(45, 157, 94, 0.3);
+  border-radius: var(--radius-sm);
+  padding: 14px 16px;
+  margin: 12px 0;
+  font-size: 0.9rem;
+  color: var(--text);
+  display: flex;
+  gap: 10px;
+}
+
+.info-box .icon { flex-shrink: 0; font-size: 1.1rem; }
+
+.warning-box {
+  background: var(--amber-glow);
+  border: 1px solid rgba(212, 168, 67, 0.3);
+  border-radius: var(--radius-sm);
+  padding: 14px 16px;
+  margin: 12px 0;
+  font-size: 0.9rem;
+  color: var(--text);
+  display: flex;
+  gap: 10px;
+}
+
+.warning-box .icon { flex-shrink: 0; font-size: 1.1rem; }
+
+.danger-box {
+  background: var(--red-glow);
+  border: 1px solid rgba(201, 74, 74, 0.3);
+  border-radius: var(--radius-sm);
+  padding: 14px 16px;
+  margin: 12px 0;
+  font-size: 0.9rem;
+  color: var(--text);
+  display: flex;
+  gap: 10px;
+}
+
+.danger-box .icon { flex-shrink: 0; font-size: 1.1rem; }
+
+/* --- Input Fields --- */
+.input-group {
+  margin: 10px 0;
+}
+
+.input-group label {
+  display: block;
+  font-size: 0.8rem;
+  color: var(--text-dim);
+  font-family: 'JetBrains Mono', monospace;
+  margin-bottom: 4px;
+}
+
+.input-group input {
+  width: 100%;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 10px 14px;
+  color: var(--text);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.85rem;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.input-group input:focus { border-color: var(--green); }
+.input-group input::placeholder { color: var(--text-muted); }
+
+/* --- Buttons --- */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 20px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  color: var(--text);
+  font-family: 'DM Sans', sans-serif;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  text-decoration: none;
+}
+
+.btn:hover { border-color: var(--green); background: var(--bg-card-hover); }
+
+.btn-primary {
+  background: var(--green);
+  border-color: var(--green);
+  color: var(--bg);
+  font-weight: 600;
+}
+
+.btn-primary:hover { background: var(--green-bright); border-color: var(--green-bright); }
+
+.btn-sm {
+  padding: 6px 12px;
+  font-size: 0.8rem;
+}
+
+/* --- Link --- */
+a { color: var(--green); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+/* --- File Tree --- */
+.file-tree {
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 16px 20px;
+  margin: 12px 0;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.82rem;
+  line-height: 2;
+  color: var(--text-dim);
+}
+
+.file-tree .folder { color: var(--amber); }
+.file-tree .file { color: var(--text); }
+.file-tree .file-secret { color: var(--red); }
+.file-tree .comment { color: var(--text-muted); font-style: italic; }
+
+/* --- Table of Contents --- */
+.toc {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 24px;
+  margin: 32px 0;
+}
+
+.toc h3 {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  margin-bottom: 16px;
+}
+
+.toc-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 0;
+  cursor: pointer;
+  color: var(--text-dim);
+  transition: color 0.2s;
+}
+
+.toc-item:hover { color: var(--green); }
+
+.toc-item .toc-num {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.8rem;
+  width: 28px;
+  text-align: center;
+  color: var(--text-muted);
+}
+
+.toc-item .toc-label { font-size: 0.95rem; }
+.toc-item .toc-time {
+  margin-left: auto;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+/* --- Env Builder --- */
+.env-builder {
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 16px;
+  margin: 12px 0;
+}
+
+.env-builder h4 {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  margin-bottom: 12px;
+}
+
+.env-var-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.env-var-row .var-name {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.8rem;
+  color: var(--green);
+  min-width: 220px;
+  white-space: nowrap;
+}
+
+.env-var-row input {
+  flex: 1;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px 10px;
+  color: var(--text);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.8rem;
+  outline: none;
+}
+
+.env-var-row input:focus { border-color: var(--green); }
+
+.env-var-row .status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--red);
+  flex-shrink: 0;
+}
+
+.env-var-row .status-dot.filled { background: var(--green); }
+
+/* --- Completion Banner --- */
+.completion-banner {
+  display: none;
+  text-align: center;
+  padding: 40px;
+  margin-top: 48px;
+  border: 2px solid var(--green);
+  border-radius: var(--radius);
+  background: var(--green-glow);
+}
+
+.completion-banner.visible { display: block; }
+
+.completion-banner h2 {
+  font-family: 'DM Serif Display', serif;
+  font-size: 2rem;
+  margin-bottom: 8px;
+}
+
+.completion-banner p { color: var(--text-dim); }
+
+/* --- Subsection --- */
+.substep {
+  margin-left: 16px;
+  padding-left: 16px;
+  border-left: 2px solid var(--border);
+}
+
+.substep .step { border-bottom: none; padding: 8px 0; }
+
+/* --- Screenshot placeholder --- */
+.screenshot-hint {
+  background: var(--bg-input);
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-sm);
+  padding: 20px;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  margin: 10px 0;
+}
+
+/* --- Responsive --- */
+@media (max-width: 640px) {
+  .hero h1 { font-size: 2rem; }
+  .container { padding: 20px 16px 100px; }
+  .section-content { padding: 0 16px 16px; }
+  .env-var-row { flex-wrap: wrap; }
+  .env-var-row .var-name { min-width: 100%; }
+}
+</style>
+</head>
+<body>
+
+<!-- Progress Bar -->
+<div class="progress-bar-container">
+  <div class="progress-bar-inner">
+    <div class="progress-track">
+      <div class="progress-fill" id="progressFill"></div>
+    </div>
+    <div class="progress-text" id="progressText">0%</div>
+  </div>
+</div>
+
+<div class="container">
+
+<!-- Hero -->
+<div class="hero">
+  <h1>Money<span>Planner</span> Setup</h1>
+  <p class="subtitle">Complete project setup guide — from zero to deployed backend</p>
+  <div class="time-estimate">
+    <span class="clock">⏱</span>
+    Estimated time: 90–120 minutes
+  </div>
+</div>
+
+<!-- Prerequisites -->
+<div class="info-box">
+  <span class="icon">📋</span>
+  <div>
+    <strong>Before you start, make sure you have:</strong><br>
+    • A Google account (Gmail works fine)<br>
+    • A computer with a web browser<br>
+    • Node.js installed (download from <a href="https://nodejs.org" target="_blank">nodejs.org</a>)<br>
+    • Python 3 installed (download from <a href="https://python.org" target="_blank">python.org</a>)<br>
+    • Git installed (download from <a href="https://git-scm.com" target="_blank">git-scm.com</a>)<br>
+    • A credit card (for Plaid — they won't charge you for sandbox mode)
+  </div>
+</div>
+
+<!-- Table of Contents -->
+<div class="toc">
+  <h3>Chapters</h3>
+  <div class="toc-item" onclick="scrollToSection(0)">
+    <span class="toc-num">1</span>
+    <span class="toc-label">Clone the Repository</span>
+    <span class="toc-time">~5 min</span>
+  </div>
+  <div class="toc-item" onclick="scrollToSection(1)">
+    <span class="toc-num">2</span>
+    <span class="toc-label">Create a Firebase Project</span>
+    <span class="toc-time">~10 min</span>
+  </div>
+  <div class="toc-item" onclick="scrollToSection(2)">
+    <span class="toc-num">3</span>
+    <span class="toc-label">Add Firebase Apps (Web, Android, iOS)</span>
+    <span class="toc-time">~15 min</span>
+  </div>
+  <div class="toc-item" onclick="scrollToSection(3)">
+    <span class="toc-num">4</span>
+    <span class="toc-label">Generate Firebase Service Account Key</span>
+    <span class="toc-time">~15 min</span>
+  </div>
+  <div class="toc-item" onclick="scrollToSection(4)">
+    <span class="toc-num">5</span>
+    <span class="toc-label">Set Up Google OAuth (Sign-In)</span>
+    <span class="toc-time">~15 min</span>
+  </div>
+  <div class="toc-item" onclick="scrollToSection(5)">
+    <span class="toc-num">6</span>
+    <span class="toc-label">Create a Plaid Account</span>
+    <span class="toc-time">~10 min</span>
+  </div>
+  <div class="toc-item" onclick="scrollToSection(6)">
+    <span class="toc-num">7</span>
+    <span class="toc-label">Create an Expo Project</span>
+    <span class="toc-time">~5 min</span>
+  </div>
+  <div class="toc-item" onclick="scrollToSection(7)">
+    <span class="toc-num">8</span>
+    <span class="toc-label">Generate Encryption Key</span>
+    <span class="toc-time">~2 min</span>
+  </div>
+  <div class="toc-item" onclick="scrollToSection(8)">
+    <span class="toc-num">9</span>
+    <span class="toc-label">Create All .env Files</span>
+    <span class="toc-time">~10 min</span>
+  </div>
+  <div class="toc-item" onclick="scrollToSection(9)">
+    <span class="toc-num">10</span>
+    <span class="toc-label">Deploy Backend to Railway</span>
+    <span class="toc-time">~15 min</span>
+  </div>
+  <div class="toc-item" onclick="scrollToSection(10)">
+    <span class="toc-num">11</span>
+    <span class="toc-label">Verify Everything Works</span>
+    <span class="toc-time">~5 min</span>
+  </div>
+</div>
+
+<!-- ============ SECTION 1: Clone Repo ============ -->
+<div class="section" id="section-0">
+  <div class="section-header" onclick="toggleSection(0)">
+    <div class="section-number">1</div>
+    <div class="section-title">Clone the Repository</div>
+    <div class="section-time">~5 min</div>
+    <div class="section-chevron">▾</div>
+  </div>
+  <div class="section-body">
+    <div class="section-content">
+      <div class="step">
+        <div class="step-check" data-step="1-1" onclick="toggleCheck(this)"></div>
+        <div class="step-content">
+          <p><strong>Open your terminal</strong> (Command Prompt on Windows, Terminal on Mac/Linux)</p>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-check" data-step="1-2" onclick="toggleCheck(this)"></div>
+        <div class="step-content">
+          <p><strong>Navigate to where you want the project</strong></p>
+          <div class="code-block">cd ~/Desktop<button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-check" data-step="1-3" onclick="toggleCheck(this)"></div>
+        <div class="step-content">
+          <p><strong>Clone the repository</strong></p>
+          <div class="code-block">git clone https://github.com/YOUR_USERNAME/MoneyPlanner.git
+cd MoneyPlanner<button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+          <p class="detail">Replace YOUR_USERNAME with your actual GitHub username. If you downloaded a ZIP instead, just unzip it and open a terminal inside that folder.</p>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-check" data-step="1-4" onclick="toggleCheck(this)"></div>
+        <div class="step-content">
+          <p><strong>Install frontend dependencies</strong></p>
+          <div class="code-block">npm install<button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-check" data-step="1-5" onclick="toggleCheck(this)"></div>
+        <div class="step-content">
+          <p><strong>Install backend dependencies</strong></p>
+          <div class="code-block">cd backend
+pip install -r requirements.txt --break-system-packages
+cd ..<button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+        </div>
+      </div>
+
+      <div class="info-box">
+        <span class="icon">📂</span>
+        <div>Your project folder should look like this. Throughout this guide, you'll create the files marked in red — they contain secrets and must never be pushed to GitHub.</div>
+      </div>
+
+      <div class="file-tree">
+<span class="folder">MoneyPlanner/</span>
+├── <span class="folder">app/</span> <span class="comment">← React Native screens</span>
+├── <span class="folder">src/</span> <span class="comment">← Components, hooks, config</span>
+├── <span class="folder">backend/</span>
+│   ├── <span class="file">app.py</span> <span class="comment">← Main server file</span>
+│   ├── <span class="file">requirements.txt</span>
+│   ├── <span class="file-secret">.env</span> <span class="comment">← YOU CREATE THIS (secrets!)</span>
+│   └── <span class="folder">config/</span>
+│       └── <span class="file-secret">firebase-service-account.json</span> <span class="comment">← YOU CREATE THIS</span>
+├── <span class="file-secret">.env</span> <span class="comment">← YOU CREATE THIS (frontend config)</span>
+├── <span class="file-secret">google-services.json</span> <span class="comment">← YOU DOWNLOAD THIS</span>
+├── <span class="file-secret">GoogleService-Info.plist</span> <span class="comment">← YOU DOWNLOAD THIS</span>
+├── <span class="file">package.json</span>
+└── <span class="file">.gitignore</span> <span class="comment">← Must list all secret files!</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ SECTION 2: Firebase Project ============ -->
+<div class="section" id="section-1">
+  <div class="section-header" onclick="toggleSection(1)">
+    <div class="section-number">2</div>
+    <div class="section-title">Create a Firebase Project</div>
+    <div class="section-time">~10 min</div>
+    <div class="section-chevron">▾</div>
+  </div>
+  <div class="section-body">
+    <div class="section-content">
+      <div class="step">
+        <div class="step-check" data-step="2-1" onclick="toggleCheck(this)"></div>
+        <div class="step-content">
+          <p><strong>Go to Firebase Console</strong></p>
+          <a href="https://console.firebase.google.com" target="_blank" class="btn btn-sm">🔗 Open Firebase Console</a>
+          <p class="detail" style="margin-top:8px">Sign in with your Google account if prompted.</p>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-check" data-step="2-2" onclick="toggleCheck(this)"></div>
+        <div class="step-content">
+          <p><strong>Click "Add project"</strong> (or "Create a project" if this is your first)</p>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-check" data-step="2-3" onclick="toggleCheck(this)"></div>
+        <div class="step-content">
+          <p><strong>Name your project:</strong> <code>Money-Planner</code></p>
+          <p class="detail">Firebase will auto-generate a Project ID like <code>money-planner-xxxxx</code>. Write it down — you'll need it throughout this guide.</p>
+          <div class="input-group">
+            <label>YOUR PROJECT ID (write it here for reference):</label>
+            <input type="text" id="firebaseProjectId" placeholder="money-planner-xxxxx" oninput="saveField(this)">
+          </div>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-check" data-step="2-4" onclick="toggleCheck(this)"></div>
+        <div class="step-content">
+          <p><strong>Enable Google Analytics</strong> (optional but recommended) → Click "Continue"</p>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-check" data-step="2-5" onclick="toggleCheck(this)"></div>
+        <div class="step-content">
+          <p><strong>Wait for project creation</strong> → Click "Continue" when done</p>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-check" data-step="2-6" onclick="toggleCheck(this)"></div>
+        <div class="step-content">
+          <p><strong>Enable Firebase Authentication</strong></p>
+          <p class="detail">In the left sidebar, click <strong>Build → Authentication → Get started</strong></p>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-check" data-step="2-7" onclick="toggleCheck(this)"></div>
+        <div class="step-content">
+          <p><strong>Enable Google sign-in provider</strong></p>
+          <p class="detail">Click <strong>Google</strong> in the provider list → Toggle <strong>Enable</strong> → Add a support email → Click <strong>Save</strong></p>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-check" data-step="2-8" onclick="toggleCheck(this)"></div>
+        <div class="step-content">
+          <p><strong>Enable Email/Password sign-in</strong> (optional fallback)</p>
+          <p class="detail">Click <strong>Email/Password</strong> → Toggle <strong>Enable</strong> → Save</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ SECTION 3: Firebase Apps ============ -->
+<div class="section" id="section-2">
+  <div class="section-header" onclick="toggleSection(2)">
+    <div class="section-number">3</div>
+    <div class="section-title">Add Firebase Apps (Web, Android, iOS)</div>
+    <div class="section-time">~15 min</div>
+    <div class="section-chevron">▾</div>
+  </div>
+  <div class="section-body">
+    <div class="section-content">
+
+      <p style="color:var(--text-dim);margin-bottom:16px">You need to register three "apps" inside Firebase — one each for Web, Android, and iOS. This gives you the config keys for each platform.</p>
+
+      <!-- Web App -->
+      <h3 style="color:var(--amber);margin:20px 0 10px;font-size:0.95rem">🌐 Web App</h3>
+
+      <div class="step">
+        <div class="step-check" data-step="3-1" onclick="toggleCheck(this)"></div>
+        <div class="step-content">
+          <p><strong>Go to Project Settings</strong> → click the ⚙️ gear icon next to "Project Overview" → <strong>Project settings</strong></p>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-check" data-step="3-2" onclick="toggleCheck(this)"></div>
+        <div class="step-content">
+          <p><strong>Scroll down</strong> to "Your apps" section → Click the <strong>Web icon</strong> (looks like <code>&lt;/&gt;</code>)</p>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-check" data-step="3-3" onclick="toggleCheck(this)"></div>
+        <div class="step-content">
+          <p><strong>Register the web app:</strong> Nickname = <code>MoneyPlanner Web</code> → Click "Register app"</p>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-check" data-step="3-4" onclick="toggleCheck(this)"></div>
+        <div class="step-content">
+          <p><strong>Copy your Firebase config values</strong> — Firebase will show you a code snippet. Copy these values:</p>
+          <div class="input-group"><label>apiKey</label><input type="text" id="firebaseApiKey" placeholder="AIzaSy..." oninput="saveField(this)"></div>
+          <div class="input-group"><label>authDomain</label><input type="text" id="firebaseAuthDomain" placeholder="money-planner-xxxxx.firebaseapp.com" oninput="saveField(this)"></div>
+          <div class="input-group"><label>storageBucket</label><input type="text" id="firebaseStorageBucket" placeholder="money-planner-xxxxx.firebasestorage.app" oninput="saveField(this)"></div>
+          <div class="input-group"><label>messagingSenderId</label><input type="text" id="firebaseSenderId" placeholder="123456789012" oninput="saveField(this)"></div>
+          <div class="input-group"><label>appId</label><input type="text" id="firebaseAppId" placeholder="1:123456789012:web:abc123..." oninput="saveField(this)"></div>
+          <div class="input-group"><label>measurementId (optional)</label><input type="text" id="firebaseMeasurementId" placeholder="G-XXXXXXXXXX" oninput="saveField(this)"></div>
+          <p class="detail">Click "Continue to console" when done.</p>
+        </div>
+      </div>
+
+      <!-- Android App -->
+      <h3 style="color:var(--green);margin:24px 0 10px;font-size:0.95rem">🤖 Android App</h3>
+
+      <div class="step">
+        <div class="step-check" data-step="3-5" onclick="toggleCheck(this)"></div>
+        <div class="step-content">
+          <p><strong>Back in Project Settings</strong>, click "Add app" → Choose <strong>Android</strong></p>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-check" data-step="3-6" onclick="toggleCheck(this)"></div>
+        <div class="step-content">
+          <p><strong>Package name:</strong> <code>com.moneyplanner.app</code></p>
+          <div class="code-block">com.moneyplanner.app<button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+          <p class="detail">App nickname: <code>MoneyPlanner Android</code> → Click "Register app"</p>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-check" data-step="3-7" onclick="toggleCheck(this)"></div>
+        <div class="step-content">
+          <p><strong>Download <code>google-services.json</code></strong></p>
+          <p class="detail">Click the download button. Move this file to <strong>your project root</strong> (the MoneyPlanner folder, NOT inside backend/).</p>
+          <div class="warning-box">
+            <span class="icon">⚠️</span>
+            <div>The file must be named exactly <code>google-services.json</code> and placed in the project root folder.</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- iOS App -->
+      <h3 style="color:var(--blue);margin:24px 0 10px;font-size:0.95rem">🍎 iOS App</h3>
+
+      <div class="step">
+        <div class="step-check" data-step="3-8" onclick="toggleCheck(this)"></div>
+        <div class="step-content">
+          <p><strong>Back in Project Settings</strong>, click "Add app" → Choose <strong>iOS</strong></p>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-check" data-step="3-9" onclick="toggleCheck(this)"></div>
+        <div class="step-content">
+          <p><strong>Bundle ID:</strong> <code>com.moneyplanner.app</code></p>
+          <div class="code-block">com.moneyplanner.app<button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+          <p class="detail">App nickname: <code>MoneyPlanner iOS</code> → Click "Register app"</p>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-check" data-step="3-10" onclick="toggleCheck(this)"></div>
+        <div class="step-content">
+          <p><strong>Download <code>GoogleService-Info.plist</code></strong></p>
+          <p class="detail">Click the download button. Move this file to <strong>your project root</strong> (same folder as google-services.json).</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ SECTION 4: Service Account Key ============ -->
+<div class="section" id="section-3">
+  <div class="section-header" onclick="toggleSection(3)">
+    <div class="section-number">4</div>
+    <div class="section-title">Generate Firebase Service Account Key</div>
+    <div class="section-time">~15 min</div>
+    <div class="section-chevron">▾</div>
+  </div>
+  <div class="section-body">
+    <div class="section-content">
+      <div class="info-box">
+        <span class="icon">💡</span>
+        <div>This file lets your backend server (not the app on your phone) communicate securely with Firebase. It's like a password for your server.</div>
+      </div>
+
+      <p style="color:var(--text-dim);margin-bottom:16px">First, try the easy way. If it's blocked by organization policies, we'll use the command line method.</p>
+
+      <h3 style="color:var(--amber);margin:16px 0 10px;font-size:0.95rem">🅰️ Try the Easy Way First</h3>
+
+      <div class="step">
+        <div class="step-check" data-step="4-1" onclick="toggleCheck(this)"></div>
+        <div class="step-content">
+          <p><strong>In Firebase Console</strong> → ⚙️ Project Settings → <strong>Service accounts</strong> tab</p>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-check" data-step="4-2" onclick="toggleCheck(this)"></div>
+        <div class="step-content">
+          <p><strong>Click "Generate new private key"</strong> → Click "Generate key" on the popup</p>
+          <p class="detail">If a JSON file downloads — great! Skip to the "Place the file" step below.</p>
+          <p class="detail">If you get an error about "Key creation is not allowed" → continue to Method B below.</p>
+        </div>
+      </div>
+
+      <h3 style="color:var(--green);margin:24px 0 10px;font-size:0.95rem">🅱️ Command Line Method (if the button was blocked)</h3>
+
+      <div class="warning-box">
+        <span class="icon">🔧</span>
+        <div>If your Google account belongs to an organization (like a company or school), it may block service account key creation. The steps below override that policy.</div>
+      </div>
+
+      <div class="step">
+        <div class="step-check" data-step="4-3" onclick="toggleCheck(this)"></div>
+        <div class="step-content">
+          <p><strong>Open Google Cloud Shell</strong> — this is a free terminal in your browser, no install needed</p>
+          <a href="https://shell.cloud.google.com" target="_blank" class="btn btn-sm">🔗 Open Cloud Shell</a>
+          <p class="detail" style="margin-top:8px">Sign in with the same Google account you used for Firebase.</p>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-check" data-step="4-4" onclick="toggleCheck(this)"></div>
+        <div class="step-content">
+          <p><strong>Set your project</strong> (replace the project ID with yours):</p>
+          <div class="code-block">gcloud config set project <span class="project-id-placeholder">YOUR_PROJECT_ID</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-check" data-step="4-5" onclick="toggleCheck(this)"></div>
+        <div class="step-content">
+          <p><strong>Find your organization ID</strong> (you need this to grant yourself permission):</p>
+          <div class="code-block">gcloud organizations list<button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+          <p class="detail">Write down the DISPLAY_NAME and ID. If nothing shows up, skip directly to the "Override the policy" step — you might not have an org restriction.</p>
+          <div class="input-group"><label>YOUR ORG ID (if shown):</label><input type="text" id="orgId" placeholder="123456789" oninput="saveField(this)"></div>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-check" data-step="4-6" onclick="toggleCheck(this)"></div>
+        <div class="step-content">
+          <p><strong>Grant yourself Org Policy Admin</strong> (replace YOUR_ORG_ID and YOUR_EMAIL):</p>
+          <div class="code-block">gcloud organizations add-iam-policy-binding YOUR_ORG_ID \
+  --member=user:YOUR_EMAIL@gmail.com \
+  --role=roles/orgpolicy.policyAdmin<button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+          <p class="detail">If this fails with a permission error, ask whoever manages your Google organization to do it for you, or try the next step anyway.</p>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-check" data-step="4-7" onclick="toggleCheck(this)"></div>
+        <div class="step-content">
+          <p><strong>Override the key creation policy</strong> — this is the critical step:</p>
+          <div class="code-block">gcloud org-policies set-policy --project=<span class="project-id-placeholder">YOUR_PROJECT_ID</span> /dev/stdin &lt;&lt;EOF
+name: projects/<span class="project-id-placeholder">YOUR_PROJECT_ID</span>/policies/iam.disableServiceAccountKeyCreation
+spec:
+  rules:
+  - enforce: false
+EOF<button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+          <div class="danger-box">
+            <span class="icon">🚨</span>
+            <div><strong>Important:</strong> Use <code>enforce: false</code> NOT <code>reset: true</code>. Reset defers to the parent org (still blocked). <code>enforce: false</code> explicitly allows key creation on your project.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-check" data-step="4-8" onclick="toggleCheck(this)"></div>
+        <div class="step-content">
+          <p><strong>Now generate the key file:</strong></p>
+          <div class="code-block">gcloud iam service-accounts keys create firebase-service-account.json \
+  --iam-account=firebase-adminsdk-fbsvc@<span class="project-id-placeholder">YOUR_PROJECT_ID</span>.iam.gserviceaccount.com<button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+          <p class="detail">If the service account email is different, find it with: <code>gcloud iam service-accounts list</code></p>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-check" data-step="4-9" onclick="toggleCheck(this)"></div>
+        <div class="step-content">
+          <p><strong>Download the file from Cloud Shell:</strong></p>
+          <p class="detail">Click the <strong>three dots ⋮</strong> at the top right of the Cloud Shell terminal → <strong>Download file</strong> → Type: <code>firebase-service-account.json</code> → Click Download.</p>
+        </div>
+      </div>
+
+      <h3 style="color:var(--green-bright);margin:24px 0 10px;font-size:0.95rem">📁 Place the file</h3>
+
+      <div class="step">
+        <div class="step-check" data-step="4-10" onclick="toggleCheck(this)"></div>
+        <div class="step-content">
+          <p><strong>Move the downloaded file to:</strong> <code>backend/config/firebase-service-account.json</code></p>
+          <div class="code-block">mv ~/Downloads/firebase-service-account.json backend/config/firebase-service-account.json<button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-check" data-step="4-11" onclick="toggleCheck(this)"></div>
+        <div class="step-content">
+          <p><strong>Verify it looks right</strong> — open the file, it should look like this:</p>
+          <div class="code-block">{
+  "type": "service_account",
+  "project_id": "money-planner-xxxxx",
+  "private_key_id": "abc123...",
+  "private_key": "-----BEGIN RSA PRIVATE KEY-----\n...",
+  "client_email": "firebase-adminsdk-xxxxx@...",
+  "client_id": "123456789...",
+  ...
+}</div>
+        </div>
+      </div>
+
+      <div class="danger-box">
+        <span class="icon">🔒</span>
+        <div><strong>NEVER commit this file to GitHub.</strong> It's like a master password to your project. Your <code>.gitignore</code> must include it (we'll verify this later).</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ SECTION 5: Google OAuth ============ -->
+<div class="section" id="section-4">
+  <div class="section-header" onclick="toggleSection(4)">
+    <div class="section-number">5</div>
+    <div class="section-title">Set Up Google OAuth (Sign-In)</div>
+    <div class="section-time">~15 min</div>
+    <div class="section-chevron">▾</div>
+  </div>
+  <div class="section-body">
+    <div class="section-content">
+      <div class="info-box">
+        <span class="icon">💡</span>
+        <div>Google OAuth lets users sign in to your app with their Google account. You need separate "Client IDs" for each platform (Web, Android, iOS).</div>
+      </div>
+
+      <div class="step">
+        <div class="step-check" data-step="5-1" onclick="toggleCheck(this)"></div>
+        <div class="step-content">
+          <p><strong>Go to Google Cloud Console Credentials</strong></p>
+          <a href="https://console.cloud.google.com/apis/credentials" target="_blank" class="btn btn-sm">🔗 Open Credentials Page</a>
+          <p class="detail" style="margin-top:8px">Make sure your Firebase project is selected at the top dropdown.</p>
+        </div>
+      </div>
+
+      <!-- Web Client -->
+      <h3 style="color:var(--amber);margin:20px 0 10px;font-size:0.95rem">🌐 Web Client ID</h3>
+
+      <div class="step">
+        <div class="step-check" data-step="5-2" onclick="toggleCheck(this)"></div>
+        <div class="step-content">
+          <p><strong>Good news — Firebase already created a Web Client ID for you!</strong></p>
+          <p class="detail">On the Credentials page, look under "OAuth 2.0 Client IDs" for one labeled <strong>"Web client (auto created by Google Service)"</strong>. Click on it and copy the <strong>Client ID</strong>.</p>
+          <div class="input-group"><label>WEB CLIENT ID:</label><input type="text" id="googleWebClientId" placeholder="123456789-xxxx.apps.googleusercontent.com" oninput="saveField(this)"></div>
+        </div>
+      </div>
+
+      <!-- Android Client -->
+      <h3 style="color:var(--green);margin:24px 0 10px;font-size:0.95rem">🤖 Android Client ID</h3>
+
+      <div class="step">
+        <div class="step-check" data-step="5-3" onclick="toggleCheck(this)"></div>
+        <div class="step-content">
+          <p><strong>Get your Android SHA-1 fingerprint</strong> — run this in your terminal:</p>
+          <div class="code-block">keytool -keystore ~/.android/debug.keystore -list -v -storepass android<button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+          <p class="detail">Look for the line that says <code>SHA1:</code> and copy the value (looks like <code>AA:BB:CC:DD:...</code>)</p>
+          <div class="input-group"><label>YOUR SHA-1 FINGERPRINT:</label><input type="text" id="sha1" placeholder="AA:BB:CC:DD:EE:FF:00:11:22:33:44:55:66:77:88:99:AA:BB:CC:DD" oninput="saveField(this)"></div>
+          <div class="info-box">
+            <span class="icon">💡</span>
+            <div><strong>Windows users:</strong> If <code>keytool</code> is not found, try the full path: <code>"C:\Program Files\Java\jdkXXX\bin\keytool"</code> or install the JDK from <a href="https://adoptium.net" target="_blank">adoptium.net</a></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-check" data-step="5-4" onclick="toggleCheck(this)"></div>
+        <div class="step-content">
+          <p><strong>Create the Android OAuth Client:</strong></p>
+          <p class="detail">On the Credentials page → Click <strong>"+ CREATE CREDENTIALS"</strong> → <strong>"OAuth client ID"</strong></p>
+          <p class="detail">Application type: <strong>Android</strong></p>
+          <p class="detail">Name: <code>MoneyPlanner Android</code></p>
+          <p class="detail">Package name: <code>com.moneyplanner.app</code></p>
+          <p class="detail">SHA-1 certificate fingerprint: paste your SHA-1 from above</p>
+          <p class="detail">Click <strong>Create</strong></p>
+          <div class="input-group"><label>ANDROID CLIENT ID:</label><input type="text" id="googleAndroidClientId" placeholder="123456789-xxxx.apps.googleusercontent.com" oninput="saveField(this)"></div>
+        </div>
+      </div>
+
+      <!-- iOS Client -->
+      <h3 style="color:var(--blue);margin:24px 0 10px;font-size:0.95rem">🍎 iOS Client ID</h3>
+
+      <div class="step">
+        <div class="step-check" data-step="5-5" onclick="toggleCheck(this)"></div>
+        <div class="step-content">
+          <p><strong>Create the iOS OAuth Client:</strong></p>
+          <p class="detail">Click <strong>"+ CREATE CREDENTIALS"</strong> → <strong>"OAuth client ID"</strong></p>
+          <p class="detail">Application type: <strong>iOS</strong></p>
+          <p class="detail">Name: <code>MoneyPlanner iOS</code></p>
+          <p class="detail">Bundle ID: <code>com.moneyplanner.app</code></p>
+          <p class="detail">Click <strong>Create</strong></p>
+          <div class="input-group"><label>iOS CLIENT ID:</label><input type="text" id="googleIosClientId" placeholder="123456789-xxxx.apps.googleusercontent.com" oninput="saveField(this)"></div>
+          <div class="warning-box">
+            <span class="icon">⚠️</span>
+            <div><strong>Note:</strong> To actually test on a real iOS device, you need an Apple Developer account ($99/year). For now you can still create the client ID — it just won't work on physical iPhones until you enroll. Simulator testing may work without it.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-check" data-step="5-6" onclick="toggleCheck(this)"></div>
+        <div class="step-content">
+          <p><strong>Set up the OAuth Consent Screen</strong> (if prompted)</p>
+          <p class="detail">If Google asks you to configure a consent screen before creating credentials:</p>
+          <p class="detail">1. Choose <strong>External</strong> → Click Create</p>
+          <p class="detail">2. App name: <code>MoneyPlanner</code></p>
+          <p class="detail">3. User support email: your email</p>
+          <p class="detail">4. Developer contact: your email</p>
+          <p class="detail">5. Click <strong>Save and Continue</strong> through the remaining steps (leave defaults)</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ SECTION 6: Plaid ============ -->
+<div class="section" id="section-5">
+  <div class="section-header" onclick="toggleSection(5)">
+    <div class="section-number">6</div>
+    <div class="section-title">Create a Plaid Account</div>
+    <div class="section-time">~10 min</div>
+    <div class="section-chevron">▾</div>
+  </div>
+  <div class="section-body">
+    <div class="section-content">
+      <div class="info-box">
+        <span class="icon">🏦</span>
+        <div>Plaid connects your app to bank accounts. In "sandbox" mode, it uses fake bank data — no real money or accounts are touched. You won't be charged.</div>
+      </div>
+
+      <div class="step">
+        <div class="step-check" data-step="6-1" onclick="toggleCheck(this)"></div>
+        <div class="step-content">
+          <p><strong>Sign up for a Plaid account</strong></p>
+          <a href="https://dashboard.plaid.com/signup" target="_blank" class="btn btn-sm">🔗 Sign up at Plaid</a>
+          <p class="detail" style="margin-top:8px">Fill out the form. For "What are you building?", say "Personal finance app". Plaid may ask about your company — just use your name if it's a personal project.</p>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-check" data-step="6-2" onclick="toggleCheck(this)"></div>
+        <div class="step-content">
+          <p><strong>Verify your email</strong> and complete any onboarding steps</p>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-check" data-step="6-3" onclick="toggleCheck(this)"></div>
+        <div class="step-content">
+          <p><strong>Get your API keys</strong></p>
+          <a href="https://dashboard.plaid.com/developers/keys" target="_blank" class="btn btn-sm">🔗 Open Plaid Keys Page</a>
+          <p class="detail" style="margin-top:8px">You'll see your <strong>client_id</strong> and <strong>Sandbox secret</strong>.</p>
+          <div class="input-group"><label>PLAID CLIENT ID:</label><input type="text" id="plaidClientId" placeholder="abc123def456..." oninput="saveField(this)"></div>
+          <div class="input-group"><label>PLAID SANDBOX SECRET:</label><input type="password" id="plaidSecret" placeholder="abc123def456..." oninput="saveField(this)"></div>
+          <div class="warning-box">
+            <span class="icon">⚠️</span>
+            <div>Make sure you copy the <strong>Sandbox</strong> secret, not the Development or Production one. Look for the column labeled "Sandbox".</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ SECTION 7: Expo ============ -->
+<div class="section" id="section-6">
+  <div class="section-header" onclick="toggleSection(6)">
+    <div class="section-number">7</div>
+    <div class="section-title">Create an Expo Project</div>
+    <div class="section-time">~5 min</div>
+    <div class="section-chevron">▾</div>
+  </div>
+  <div class="section-body">
+    <div class="section-content">
+      <div class="info-box">
+        <span class="icon">📱</span>
+        <div>Expo is the framework that turns your code into a mobile app. You need an Expo account and project to build and deploy the app.</div>
+      </div>
+
+      <div class="step">
+        <div class="step-check" data-step="7-1" onclick="toggleCheck(this)"></div>
+        <div class="step-content">
+          <p><strong>Create an Expo account</strong></p>
+          <a href="https://expo.dev/signup" target="_blank" class="btn btn-sm">🔗 Sign up at Expo</a>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-check" data-step="7-2" onclick="toggleCheck(this)"></div>
+        <div class="step-content">
+          <p><strong>Create a new project at Expo</strong></p>
+          <a href="https://expo.dev/accounts/_/projects" target="_blank" class="btn btn-sm">🔗 Expo Projects Page</a>
+          <p class="detail" style="margin-top:8px">Click "Create project" → Name it <code>moneyplanner</code> (or whatever you prefer)</p>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-check" data-step="7-3" onclick="toggleCheck(this)"></div>
+        <div class="step-content">
+          <p><strong>Copy your Project ID</strong></p>
+          <p class="detail">Click into your project → the Project ID is shown in the project settings or the URL. It looks like a UUID: <code>xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx</code></p>
+          <div class="input-group"><label>EXPO PROJECT ID:</label><input type="text" id="expoProjectId" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" oninput="saveField(this)"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ SECTION 8: Encryption Key ============ -->
+<div class="section" id="section-7">
+  <div class="section-header" onclick="toggleSection(7)">
+    <div class="section-number">8</div>
+    <div class="section-title">Generate Encryption Key</div>
+    <div class="section-time">~2 min</div>
+    <div class="section-chevron">▾</div>
+  </div>
+  <div class="section-body">
+    <div class="section-content">
+      <div class="info-box">
+        <span class="icon">🔐</span>
+        <div>This key encrypts sensitive data (like Plaid access tokens) stored on your server. Generate it once and use it everywhere.</div>
+      </div>
+
+      <div class="step">
+        <div class="step-check" data-step="8-1" onclick="toggleCheck(this)"></div>
+        <div class="step-content">
+          <p><strong>Run this command in your terminal:</strong></p>
+          <div class="code-block">python3 -c "import secrets; print(secrets.token_hex(32))"<button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+          <p class="detail">It will print a long random string like <code>a7f2b3c4d5e6...</code>. Copy it.</p>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-check" data-step="8-2" onclick="toggleCheck(this)"></div>
+        <div class="step-content">
+          <p><strong>Or generate one right here:</strong></p>
+          <button class="btn btn-primary btn-sm" onclick="generateEncryptionKey()">🎲 Generate Key</button>
+          <div class="input-group" style="margin-top:10px"><label>YOUR ENCRYPTION KEY:</label><input type="text" id="encryptionKey" placeholder="Click generate or paste your key" oninput="saveField(this)"></div>
+          <div class="danger-box">
+            <span class="icon">🚨</span>
+            <div><strong>Save this key somewhere safe.</strong> If you lose it, you can't decrypt your stored data. It goes in both your local backend/.env AND Railway.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ SECTION 9: .env Files ============ -->
+<div class="section" id="section-8">
+  <div class="section-header" onclick="toggleSection(8)">
+    <div class="section-number">9</div>
+    <div class="section-title">Create All .env Files</div>
+    <div class="section-time">~10 min</div>
+    <div class="section-chevron">▾</div>
+  </div>
+  <div class="section-body">
+    <div class="section-content">
+      <div class="info-box">
+        <span class="icon">📝</span>
+        <div>Now we put all the values you've collected into the right files. If you filled in the fields above, the files below will auto-populate.</div>
+      </div>
+
+      <!-- Root .env -->
+      <h3 style="color:var(--amber);margin:16px 0 10px;font-size:0.95rem">📄 Root .env (Frontend — project root)</h3>
+
+      <div class="step">
+        <div class="step-check" data-step="9-1" onclick="toggleCheck(this)"></div>
+        <div class="step-content">
+          <p><strong>Create a file called <code>.env</code> in your project root</strong> with this content:</p>
+          <div class="code-block" id="rootEnvOutput"># Loading... fill in values above<button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+        </div>
+      </div>
+
+      <!-- Backend .env -->
+      <h3 style="color:var(--green);margin:24px 0 10px;font-size:0.95rem">📄 backend/.env (Backend — local development)</h3>
+
+      <div class="step">
+        <div class="step-check" data-step="9-2" onclick="toggleCheck(this)"></div>
+        <div class="step-content">
+          <p><strong>Create a file called <code>.env</code> inside the <code>backend/</code> folder</strong> with this content:</p>
+          <div class="code-block" id="backendEnvOutput"># Loading... fill in values above<button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+        </div>
+      </div>
+
+      <!-- Railway vars -->
+      <h3 style="color:var(--blue);margin:24px 0 10px;font-size:0.95rem">🚂 Railway Variables (NOT a file — paste in Railway UI)</h3>
+
+      <div class="step">
+        <div class="step-check" data-step="9-3" onclick="toggleCheck(this)"></div>
+        <div class="step-content">
+          <p><strong>These go directly into Railway's dashboard</strong> (Variables tab), not in any file.</p>
+          <div class="code-block" id="railwayEnvOutput"># Loading... fill in values above<button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+          <div class="warning-box">
+            <span class="icon">⚠️</span>
+            <div>For <code>FIREBASE_SERVICE_ACCOUNT_JSON</code>: open your <code>firebase-service-account.json</code> file, select ALL the text, and paste the entire thing as the value in Railway. It should be one big JSON blob.</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- .gitignore -->
+      <h3 style="color:var(--red);margin:24px 0 10px;font-size:0.95rem">🛡️ Verify .gitignore</h3>
+
+      <div class="step">
+        <div class="step-check" data-step="9-4" onclick="toggleCheck(this)"></div>
+        <div class="step-content">
+          <p><strong>Open your <code>.gitignore</code> file and make sure it includes these lines:</strong></p>
+          <div class="code-block">.env
+backend/.env
+backend/config/firebase-service-account.json
+google-services.json
+GoogleService-Info.plist<button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+          <p class="detail">If any are missing, add them now. This prevents your secrets from being uploaded to GitHub.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ SECTION 10: Railway Deploy ============ -->
+<div class="section" id="section-9">
+  <div class="section-header" onclick="toggleSection(9)">
+    <div class="section-number">10</div>
+    <div class="section-title">Deploy Backend to Railway</div>
+    <div class="section-time">~15 min</div>
+    <div class="section-chevron">▾</div>
+  </div>
+  <div class="section-body">
+    <div class="section-content">
+      <div class="info-box">
+        <span class="icon">🚂</span>
+        <div>Railway hosts your Python backend server so your app can talk to Firebase and Plaid. It has a free tier that's enough for development.</div>
+      </div>
+
+      <div class="step">
+        <div class="step-check" data-step="10-1" onclick="toggleCheck(this)"></div>
+        <div class="step-content">
+          <p><strong>Sign up for Railway</strong></p>
+          <a href="https://railway.app" target="_blank" class="btn btn-sm">🔗 Open Railway</a>
+          <p class="detail" style="margin-top:8px">Sign up with your GitHub account (easiest way).</p>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-check" data-step="10-2" onclick="toggleCheck(this)"></div>
+        <div class="step-content">
+          <p><strong>Create a new project</strong> → Click "New Project" → "Deploy from GitHub repo" → Select your MoneyPlanner repository</p>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-check" data-step="10-3" onclick="toggleCheck(this)"></div>
+        <div class="step-content">
+          <p><strong>Set the Root Directory</strong></p>
+          <p class="detail">Go to your service → <strong>Settings</strong> → under "Source" section → <strong>Root Directory</strong> → set to:</p>
+          <div class="code-block">backend<button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+          <div class="danger-box">
+            <span class="icon">🚨</span>
+            <div><strong>Critical:</strong> Type exactly <code>backend</code> — not <code>/backend</code>, not <code>./backend</code>. No leading slash!</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-check" data-step="10-4" onclick="toggleCheck(this)"></div>
+        <div class="step-content">
+          <p><strong>Set the Custom Start Command</strong></p>
+          <p class="detail">In <strong>Settings</strong> → under "Deploy" section → <strong>Custom Start Command</strong>:</p>
+          <div class="code-block">gunicorn "app:create_app()" --bind 0.0.0.0:$PORT --workers 2<button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-check" data-step="10-5" onclick="toggleCheck(this)"></div>
+        <div class="step-content">
+          <p><strong>Add all Railway environment variables</strong></p>
+          <p class="detail">Go to <strong>Variables</strong> tab → Click "New Variable" for each one. Use the Railway variables from Section 9 above.</p>
+          <p class="detail">The variables to add are: <code>PLAID_CLIENT_ID</code>, <code>PLAID_SECRET</code>, <code>PLAID_ENV</code>, <code>FIREBASE_PROJECT_ID</code>, <code>FIREBASE_SERVICE_ACCOUNT_JSON</code>, <code>ENCRYPTION_KEY</code>, <code>DEV_MODE</code>, <code>PORT</code>, <code>ALLOWED_ORIGINS</code></p>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-check" data-step="10-6" onclick="toggleCheck(this)"></div>
+        <div class="step-content">
+          <p><strong>Generate a public URL</strong></p>
+          <p class="detail">Go to <strong>Settings</strong> → under "Networking" → Click <strong>"Generate Domain"</strong>. Railway will give you a URL like <code>https://xxx-production-xxxx.up.railway.app</code></p>
+          <div class="input-group"><label>YOUR RAILWAY URL:</label><input type="text" id="railwayUrl" placeholder="https://xxx-production-xxxx.up.railway.app" oninput="saveField(this)"></div>
+          <div class="warning-box">
+            <span class="icon">⚠️</span>
+            <div>Copy this URL and update <code>EXPO_PUBLIC_API_BASE_URL</code> in your root <code>.env</code> file to match.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-check" data-step="10-7" onclick="toggleCheck(this)"></div>
+        <div class="step-content">
+          <p><strong>Deploy!</strong> Railway auto-deploys when you push to GitHub, or click "Deploy" manually.</p>
+          <p class="detail">Watch the build logs — it should install Python packages and start gunicorn. The whole build takes about 45–60 seconds.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ SECTION 11: Verify ============ -->
+<div class="section" id="section-10">
+  <div class="section-header" onclick="toggleSection(10)">
+    <div class="section-number">11</div>
+    <div class="section-title">Verify Everything Works</div>
+    <div class="section-time">~5 min</div>
+    <div class="section-chevron">▾</div>
+  </div>
+  <div class="section-body">
+    <div class="section-content">
+      <div class="step">
+        <div class="step-check" data-step="11-1" onclick="toggleCheck(this)"></div>
+        <div class="step-content">
+          <p><strong>Test the health endpoint</strong> — open this URL in your browser (use your Railway URL):</p>
+          <div class="code-block" id="healthCheckUrl">https://YOUR_RAILWAY_URL/health<button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+          <p class="detail">You should see a JSON response like:</p>
+          <div class="code-block">{"status": "ok", "dev_mode": true, "plaid_env": "sandbox", "timestamp": "..."}</div>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-check" data-step="11-2" onclick="toggleCheck(this)"></div>
+        <div class="step-content">
+          <p><strong>Test locally</strong> — run the backend on your machine:</p>
+          <div class="code-block">cd backend
+python3 app.py<button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+          <p class="detail">Then open <a href="http://localhost:5050/health" target="_blank">http://localhost:5050/health</a> in your browser.</p>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-check" data-step="11-3" onclick="toggleCheck(this)"></div>
+        <div class="step-content">
+          <p><strong>Run the verification script</strong></p>
+          <div class="code-block">cd ..
+bash verify-setup.sh<button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+          <p class="detail">If you have the verify-setup.sh script from earlier, run it. All checks should pass (except possibly connectivity if your backend just deployed).</p>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-check" data-step="11-4" onclick="toggleCheck(this)"></div>
+        <div class="step-content">
+          <p><strong>Start the Expo app</strong></p>
+          <div class="code-block">npx expo start<button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+          <p class="detail">Scan the QR code with the Expo Go app on your phone, or press <code>a</code> for Android emulator / <code>i</code> for iOS simulator.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Completion Banner -->
+<div class="completion-banner" id="completionBanner">
+  <h2>🎉 Setup Complete!</h2>
+  <p>All steps checked off. Your MoneyPlanner project is ready to build.</p>
+  <p style="margin-top:12px;color:var(--green)">Now go make something amazing.</p>
+</div>
+
+</div>
+
+<script>
+// --- State ---
+const state = {
+  checks: {},
+  fields: {},
+  openSections: new Set()
+};
+
+// Load from localStorage
+try {
+  const saved = localStorage.getItem('moneyplanner-setup');
+  if (saved) {
+    const parsed = JSON.parse(saved);
+    Object.assign(state, parsed);
+    state.openSections = new Set(parsed.openSections || []);
+  }
+} catch(e) {}
+
+function saveState() {
+  try {
+    localStorage.setItem('moneyplanner-setup', JSON.stringify({
+      ...state,
+      openSections: [...state.openSections]
+    }));
+  } catch(e) {}
+}
+
+// --- Init ---
+function init() {
+  // Restore checks
+  document.querySelectorAll('.step-check').forEach(el => {
+    const step = el.dataset.step;
+    if (state.checks[step]) el.classList.add('checked');
+  });
+
+  // Restore fields
+  Object.entries(state.fields).forEach(([id, val]) => {
+    const el = document.getElementById(id);
+    if (el) el.value = val;
+  });
+
+  // Restore open sections
+  state.openSections.forEach(i => {
+    const section = document.getElementById(`section-${i}`);
+    if (section) section.classList.add('open');
+  });
+
+  updateProgress();
+  updateEnvOutputs();
+  updateSectionCompletion();
+}
+
+// --- Sections ---
+function toggleSection(index) {
+  const section = document.getElementById(`section-${index}`);
+  section.classList.toggle('open');
+  if (section.classList.contains('open')) {
+    state.openSections.add(index);
+  } else {
+    state.openSections.delete(index);
+  }
+  saveState();
+}
+
+function scrollToSection(index) {
+  const section = document.getElementById(`section-${index}`);
+  section.classList.add('open');
+  state.openSections.add(index);
+  saveState();
+  section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+// --- Checkboxes ---
+function toggleCheck(el) {
+  el.classList.toggle('checked');
+  state.checks[el.dataset.step] = el.classList.contains('checked');
+  saveState();
+  updateProgress();
+  updateSectionCompletion();
+}
+
+function updateProgress() {
+  const total = document.querySelectorAll('.step-check').length;
+  const checked = document.querySelectorAll('.step-check.checked').length;
+  const pct = total ? Math.round((checked / total) * 100) : 0;
+  document.getElementById('progressFill').style.width = pct + '%';
+  document.getElementById('progressText').textContent = pct + '%';
+
+  const banner = document.getElementById('completionBanner');
+  if (pct === 100) {
+    banner.classList.add('visible');
+  } else {
+    banner.classList.remove('visible');
+  }
+}
+
+function updateSectionCompletion() {
+  for (let i = 0; i < 11; i++) {
+    const section = document.getElementById(`section-${i}`);
+    if (!section) continue;
+    const checks = section.querySelectorAll('.step-check');
+    const allChecked = checks.length > 0 && [...checks].every(c => c.classList.contains('checked'));
+    section.classList.toggle('completed', allChecked);
+  }
+}
+
+// --- Fields ---
+function saveField(el) {
+  state.fields[el.id] = el.value;
+  saveState();
+  updateEnvOutputs();
+}
+
+// --- Env Output Generation ---
+function f(id) { return state.fields[id] || ''; }
+
+function updateEnvOutputs() {
+  const pid = f('firebaseProjectId') || 'YOUR_PROJECT_ID';
+
+  // Root .env
+  const rootEnv = `# Firebase Client Config
+EXPO_PUBLIC_FIREBASE_API_KEY=${f('firebaseApiKey')}
+EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN=${f('firebaseAuthDomain') || pid + '.firebaseapp.com'}
+EXPO_PUBLIC_FIREBASE_PROJECT_ID=${pid}
+EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET=${f('firebaseStorageBucket') || pid + '.firebasestorage.app'}
+EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=${f('firebaseSenderId')}
+EXPO_PUBLIC_FIREBASE_APP_ID=${f('firebaseAppId')}
+EXPO_PUBLIC_FIREBASE_MEASUREMENT_ID=${f('firebaseMeasurementId')}
+
+# Google OAuth Client IDs
+EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID=${f('googleWebClientId')}
+EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID=${f('googleAndroidClientId')}
+EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID=${f('googleIosClientId')}
+
+# Plaid
+EXPO_PUBLIC_PLAID_ENV=sandbox
+EXPO_PUBLIC_PLAID_ANDROID_PACKAGE_NAME=com.moneyplanner.app
+EXPO_PUBLIC_PLAID_IOS_BUNDLE_ID=com.moneyplanner.app
+
+# Backend URL
+EXPO_PUBLIC_API_BASE_URL=${f('railwayUrl') || 'https://YOUR_RAILWAY_URL'}
+
+# Expo
+EXPO_PUBLIC_PROJECT_ID=${f('expoProjectId')}`;
+
+  const rootEl = document.getElementById('rootEnvOutput');
+  rootEl.childNodes[0].textContent = rootEnv;
+
+  // Backend .env
+  const backendEnv = `PLAID_CLIENT_ID=${f('plaidClientId')}
+PLAID_SECRET=${f('plaidSecret')}
+PLAID_ENV=sandbox
+FIREBASE_SERVICE_ACCOUNT=config/firebase-service-account.json
+FIREBASE_PROJECT_ID=${pid}
+ENCRYPTION_KEY=${f('encryptionKey')}
+DEV_MODE=true
+PORT=5050
+ALLOWED_ORIGINS=*`;
+
+  const backendEl = document.getElementById('backendEnvOutput');
+  backendEl.childNodes[0].textContent = backendEnv;
+
+  // Railway vars
+  const railwayEnv = `PLAID_CLIENT_ID=${f('plaidClientId')}
+PLAID_SECRET=${f('plaidSecret')}
+PLAID_ENV=sandbox
+FIREBASE_PROJECT_ID=${pid}
+FIREBASE_SERVICE_ACCOUNT_JSON=<paste entire firebase-service-account.json contents>
+ENCRYPTION_KEY=${f('encryptionKey')}
+DEV_MODE=true
+PORT=5050
+ALLOWED_ORIGINS=*`;
+
+  const railwayEl = document.getElementById('railwayEnvOutput');
+  railwayEl.childNodes[0].textContent = railwayEnv;
+
+  // Health check URL
+  const healthEl = document.getElementById('healthCheckUrl');
+  if (healthEl) {
+    healthEl.childNodes[0].textContent = (f('railwayUrl') || 'https://YOUR_RAILWAY_URL') + '/health';
+  }
+
+  // Update project ID placeholders
+  document.querySelectorAll('.project-id-placeholder').forEach(el => {
+    el.textContent = pid;
+  });
+}
+
+// --- Copy ---
+function copyCode(btn) {
+  const block = btn.parentElement;
+  const text = block.childNodes[0].textContent.trim();
+  navigator.clipboard.writeText(text).then(() => {
+    btn.textContent = 'Copied!';
+    btn.classList.add('copied');
+    setTimeout(() => {
+      btn.textContent = 'Copy';
+      btn.classList.remove('copied');
+    }, 2000);
+  });
+}
+
+// --- Encryption Key Generator ---
+function generateEncryptionKey() {
+  const array = new Uint8Array(32);
+  crypto.getRandomValues(array);
+  const key = Array.from(array, b => b.toString(16).padStart(2, '0')).join('');
+  document.getElementById('encryptionKey').value = key;
+  state.fields['encryptionKey'] = key;
+  saveState();
+  updateEnvOutputs();
+}
+
+// --- Init ---
+init();
+</script>
+
+</body>
+</html>
