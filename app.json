@@ -15,7 +15,7 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.moneyplanner.app",
+      "bundleIdentifier": "com.na5h13.keel",
       "googleServicesFile": "./GoogleService-Info.plist",
       "infoPlist": {
         "CFBundleURLTypes": [
@@ -32,7 +32,7 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#0A0F1C"
       },
-      "package": "com.moneyplanner.app",
+      "package": "com.na5h13.keel",
       "googleServicesFile": "./google-services.json"
     },
     "web": {
