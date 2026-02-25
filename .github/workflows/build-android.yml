@@ -48,7 +48,43 @@ jobs:
       - name: Write google-services.json
         env:
           GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
-        run: printenv GOOGLE_SERVICES_JSON > google-services.json
+        run: |
+          if [ -n "$GOOGLE_SERVICES_JSON" ]; then
+            printenv GOOGLE_SERVICES_JSON > google-services.json
+            echo "Wrote google-services.json from secret"
+          else
+            echo "GOOGLE_SERVICES_JSON secret not set — writing dev placeholder"
+            python3 -c "
+          import json
+          data = {
+            'project_info': {
+              'project_number': '000000000000',
+              'project_id': 'keel-dev-placeholder',
+              'storage_bucket': 'keel-dev-placeholder.appspot.com'
+            },
+            'client': [{
+              'client_info': {
+                'mobilesdk_app_id': '1:000000000000:android:0000000000000000',
+                'android_client_info': {'package_name': 'com.na5h13.keel'}
+              },
+              'oauth_client': [],
+              'api_key': [{'current_key': 'placeholder-api-key'}],
+              'services': {'appinvite_service': {'other_platform_oauth_client': []}}
+            }],
+            'configuration_version': '1'
+          }
+          with open('google-services.json', 'w') as f:
+            json.dump(data, f, indent=2)
+          "
+          fi
+          python3 -c "
+          import json, sys
+          data = json.load(open('google-services.json'))
+          assert data.get('configuration_version') == '1', 'Missing configuration_version: 1'
+          assert 'project_info' in data, 'Missing project_info'
+          assert 'client' in data, 'Missing client'
+          print('google-services.json is valid')
+          "
 
       - name: Expo prebuild
         run: npx expo prebuild --platform android --no-install
@@ -68,12 +104,10 @@ jobs:
 
       - name: Configure signing in gradle.properties
         run: |
-          cat >> android/gradle.properties << 'EOF'
-          MYAPP_UPLOAD_STORE_FILE=release.keystore
-          MYAPP_UPLOAD_KEY_ALIAS=keel
-          MYAPP_UPLOAD_STORE_PASSWORD=keel_release_2024
-          MYAPP_UPLOAD_KEY_PASSWORD=keel_release_2024
-          EOF
+          echo "MYAPP_UPLOAD_STORE_FILE=release.keystore" >> android/gradle.properties
+          echo "MYAPP_UPLOAD_KEY_ALIAS=keel" >> android/gradle.properties
+          echo "MYAPP_UPLOAD_STORE_PASSWORD=keel_release_2024" >> android/gradle.properties
+          echo "MYAPP_UPLOAD_KEY_PASSWORD=keel_release_2024" >> android/gradle.properties
 
       - name: Patch build.gradle for signing
         run: |

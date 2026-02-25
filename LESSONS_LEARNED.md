@@ -1,0 +1,141 @@
+# Lessons Learned
+
+> **Living Document** — Add entries after every non-trivial fix, debugging session, or discovery.
+> Format: What happened, why, and what to do next time.
+> Goal: Never hit the same issue twice.
+
+---
+
+## How to Add an Entry
+
+```markdown
+### YYYY-MM-DD — Short Title
+
+**Context:** What were you trying to do?
+**Problem:** What went wrong?
+**Root Cause:** Why did it happen?
+**Solution:** What fixed it?
+**Rule:** One-line takeaway for future reference.
+```
+
+---
+
+## Entries
+
+### 2026-02-24 — MoneyPlanner-built Worktree Pollutes TypeScript
+
+**Context:** Running `tsc --noEmit` after scaffolding the new codebase.
+**Problem:** TypeScript errors from files in `MoneyPlanner-built/MoneyPlanner-main/` — an old git worktree.
+**Root Cause:** tsconfig.json's default `include` glob (`**/*.ts`) picks up `.ts` files in all subdirectories, including worktrees.
+**Solution:** Added `"exclude": ["node_modules", "MoneyPlanner-built", "backend", "original openspec"]` to tsconfig.json.
+**Rule:** Always exclude worktree directories, backend, and non-app directories from frontend tsconfig.
+
+### 2026-02-24 — Duplicate Properties from Spread Operator
+
+**Context:** Creating the tab bar layout with `...shadows.navBar` spread plus explicit `elevation: 0`.
+**Problem:** TypeScript/lint error for duplicate `elevation` property — the spread already included `elevation`.
+**Root Cause:** Spread operator properties collide with explicitly set properties.
+**Solution:** Move spread before explicit properties so explicit values override, or remove the duplicate.
+**Rule:** When spreading style objects, check what properties they contain before adding explicit overrides.
+
+### 2026-02-24 — Express v5 req.params.id Returns string | string[]
+
+**Context:** Writing Express route handlers that use `req.params.id` with Firestore `.doc()`.
+**Problem:** TypeScript error — Firestore `.doc()` requires `string` but Express v5 types define `req.params.id` as `string | string[]`.
+**Root Cause:** Express v5 changed param types to be more permissive (supports array params).
+**Solution:** Cast with `as string` on all `req.params.id` usages (13 fixes across 4 route files).
+**Rule:** Express v5 params need `as string` cast for single-value usage. Check this when creating new routes.
+
+### 2026-02-25 — Plaid SDK ESM Imports Missing .js Extensions
+
+**Context:** Running `npx expo prebuild` — fails on Plaid SDK.
+**Problem:** `ERR_MODULE_NOT_FOUND: Cannot find module '.../dist/PlaidLink'` — bare imports without `.js` extension.
+**Root Cause:** react-native-plaid-link-sdk ships ESM in `dist/` with bare relative imports (`from './PlaidLink'`) that Node's strict ESM resolver rejects.
+**Solution:** Created `scripts/fix-plaid-esm.js` postinstall script that walks `dist/` and patches all bare imports to add `.js` extensions. Patches 22 imports.
+**Rule:** If an RN library ships ESM with bare imports, add a postinstall patch script. Check this on every Plaid SDK version bump.
+
+### 2026-02-25 — Plaid SDK v12.8.0 Has No Expo Config Plugin
+
+**Context:** app.json listed `react-native-plaid-link-sdk` in Expo plugins array with android config.
+**Problem:** `PluginError: Package does not contain a valid config plugin` during `expo prebuild`.
+**Root Cause:** v12.8.0 doesn't ship an `app.plugin.js` or plugin entry. Autolinking handles native module registration.
+**Solution:** Removed `react-native-plaid-link-sdk` from the plugins array in app.json.
+**Rule:** Before adding an RN library to Expo plugins, verify it actually ships a config plugin (`app.plugin.js` or `plugin` field in package.json).
+
+### 2026-02-25 — Placeholder PNG Assets Must Be Valid
+
+**Context:** Running `expo prebuild --platform android`.
+**Problem:** `Crc error` in jimp during image processing.
+**Root Cause:** Asset PNGs (icon.png, adaptive-icon.png, etc.) were 70-byte stub files, not valid PNG images.
+**Solution:** Generated valid solid-color PNGs using ImageMagick (`convert -size 1024x1024 xc:'#f5f2ee' assets/icon.png`).
+**Rule:** Always use valid PNG files for Expo assets, even as placeholders. Use ImageMagick to generate solid-color placeholders.
+
+### 2026-02-25 — Expo Prebuild Generates signingConfigs with Debug Only
+
+**Context:** CI workflow patches build.gradle to add release signing config.
+**Problem:** `Could not get unknown property 'release' for SigningConfig container` — Gradle build fails.
+**Root Cause:** The Python patch checked `if 'signingConfigs' not in content` — but Expo prebuild ALREADY generates a `signingConfigs` block (with `debug` only). So the patch skipped inserting the release config, then tried to reference `signingConfigs.release` which didn't exist.
+**Solution:** Rewrote the patch to insert a `release` block INSIDE the existing `signingConfigs` (after the debug block) and update the release buildType reference from `signingConfigs.debug` to `signingConfigs.release`.
+**Rule:** When patching Expo-generated build.gradle, always inspect the actual generated output first. Don't assume the structure — `expo prebuild` generates its own signing config.
+
+### 2026-02-25 — google-services.json Mangled by Shell echo
+
+**Context:** CI writes google-services.json from a GitHub Secret.
+**Problem:** `Malformed root json at .../google-services.json` during Gradle build.
+**Root Cause:** `echo '${{ secrets.GOOGLE_SERVICES_JSON }}'` in the workflow — single quotes can break if the JSON contains single quotes, and shell interpolation can mangle the content.
+**Solution:** Use `printenv` to write the secret: set it as an env var, then `printenv GOOGLE_SERVICES_JSON > google-services.json`.
+**Rule:** Never use `echo '...'` to write JSON secrets in CI. Use `printenv` with an environment variable to avoid shell quoting issues.
+
+### 2026-02-25 — google-services.json Placeholder Missing `configuration_version`
+
+**Context:** CI builds when `GOOGLE_SERVICES_JSON` secret is not set fall back to a Python-generated placeholder.
+**Problem:** `Malformed root json at .../android/app/google-services.json` — Gradle build fails even though `python3 json.load()` validates it as valid JSON.
+**Root Cause:** The `com.google.gms:google-services` Gradle plugin requires `"configuration_version": "1"` as a root-level field. Python's `json.load()` doesn't check for required domain fields — only syntax. The placeholder omitted `configuration_version` entirely.
+**Solution:** Added `"configuration_version": "1"` (and `oauth_client`/`services` for completeness) to the placeholder. Also hardened the CI validation step to assert `configuration_version == "1"` before continuing.
+**Rule:** After writing google-services.json in CI, validate domain requirements (configuration_version, project_info, client), not just JSON syntax.
+
+### 2026-02-25 — Heredoc Indentation Adds Leading Whitespace to .env
+
+**Context:** CI writes .env file using an indented heredoc in YAML.
+**Problem:** .env values had leading spaces (e.g., `          EXPO_PUBLIC_DEV_MODE=true`).
+**Root Cause:** YAML indentation is preserved in heredoc content. `<<-` only strips tabs, not spaces.
+**Solution:** Use individual `echo` statements instead of heredoc for .env values.
+**Rule:** In GitHub Actions YAML, don't use heredocs for config files — indentation leaks into content. Use individual echo/printf statements.
+
+---
+
+## Quick Reference — Common Gotchas
+
+> Add one-liners here for fast lookup. Link to full entry above if details needed.
+
+| Gotcha | Solution |
+|--------|----------|
+| Plaid SDK ESM bare imports | Postinstall script `scripts/fix-plaid-esm.js` patches them |
+| Plaid SDK has no Expo plugin | Don't add to app.json plugins — autolinking handles it |
+| Expo prebuild generates signingConfigs | Patch INSIDE existing block, don't try to add new block |
+| google-services.json in CI | Use `printenv`, never `echo '...'`; placeholder MUST include `configuration_version: "1"` |
+| .env heredoc in YAML | Use individual `echo` lines, not heredoc |
+| Placeholder PNGs must be valid | Use ImageMagick to generate solid-color PNGs |
+| Express v5 params are `string \| string[]` | Cast with `as string` for Firestore |
+| tsconfig picks up worktrees | Add worktree dirs to `exclude` |
+| Backend is in `backend/` not root | All backend commands need `cd backend/` or absolute paths |
+| All amounts are cents (integer) | Use `formatAmount(cents)` for display, never divide by 100 inline |
+
+---
+
+## Patterns That Work Well
+
+> Things that went right — keep doing these.
+
+| Pattern | Why It Works |
+|---------|-------------|
+| Cursor-based Plaid sync | Only fetches new/modified transactions — efficient and idempotent |
+| Postinstall patch scripts | Automated fix for broken npm packages, runs on every install |
+| `printenv` for CI secrets | Avoids all shell quoting issues with JSON |
+| Expo prebuild in CI | Generates fresh native project every build — no stale configs |
+| GlassCard component tiers | standard/strong/inset covers all use cases consistently |
+| Zustand single store | Simple, TypeScript-inferred, no provider boilerplate |
+| formatAmount(cents) utility | Single source of truth for financial display formatting |
+| DEV_MODE env var | Bypasses auth + phase gates for fast development iteration |
+| ImageMagick for placeholder assets | Valid PNGs in one command |
+| Individual echo for .env | Clean values, no whitespace issues |
