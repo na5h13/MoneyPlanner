@@ -933,3 +933,4 @@ if __name__ == "__main__":
     print(f"MoneyPlanner API — http://localhost:{port}")
     print(f"Plaid: {PLAID_ENV} | Dev mode: {DEV_MODE}")
     app.run(host="0.0.0.0", port=port, debug=True)
+# Tue Feb 24 11:25:59 PM EST 2026
