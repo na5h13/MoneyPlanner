@@ -91,41 +91,13 @@ jobs:
 
       - name: Patch Kotlin version for Compose Compiler compatibility
         run: |
-          python3 << 'PYEOF'
-          import re, sys
-
-          with open('android/build.gradle', 'r') as f:
-              content = f.read()
-
-          # Print file for diagnosis
-          print("=== android/build.gradle (first 50 lines) ===")
-          for i, line in enumerate(content.splitlines()[:50], 1):
-              print(f"{i:3}: {line}")
-          print("=== end ===")
-
-          # Match any of: kotlinVersion = "x.x.x", kotlin_version = "x.x.x",
-          # kotlin-gradle-plugin:x.x.x, all with single or double quotes
-          patterns = [
-              (r'kotlinVersion\s*=\s*["\'][\d.]+["\']',        'kotlinVersion = "1.9.25"'),
-              (r'kotlin_version\s*=\s*["\'][\d.]+["\']',       'kotlin_version = "1.9.25"'),
-              (r'(kotlin-gradle-plugin:)[\d.]+',                r'\g<1>1.9.25'),
-          ]
-
-          patched = content
-          for pattern, replacement in patterns:
-              result = re.sub(pattern, replacement, patched)
-              if result != patched:
-                  print(f"Applied patch for pattern: {pattern}")
-                  patched = result
-
-          if patched == content:
-              print("ERROR: No Kotlin version pattern found in android/build.gradle")
-              sys.exit(1)
-
-          with open('android/build.gradle', 'w') as f:
-              f.write(patched)
-          print("Kotlin version patched to 1.9.25")
-          PYEOF
+          # android/build.gradle uses findProperty('android.kotlinVersion') ?: '1.9.25'
+          # expo prebuild writes android.kotlinVersion=1.9.24 into gradle.properties,
+          # overriding the default. Remove it and set 1.9.25.
+          sed -i '/^android\.kotlinVersion/d' android/gradle.properties
+          echo "android.kotlinVersion=1.9.25" >> android/gradle.properties
+          echo "Patched android.kotlinVersion=1.9.25 in gradle.properties"
+          grep "kotlinVersion" android/gradle.properties
 
       - name: Generate keystore
         run: |
