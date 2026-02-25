@@ -32,23 +32,23 @@ jobs:
 
       - name: Write .env
         run: |
-          cat > .env << ENVEOF
-          EXPO_PUBLIC_FIREBASE_API_KEY=${{ secrets.EXPO_PUBLIC_FIREBASE_API_KEY }}
-          EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN=${{ secrets.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN }}
-          EXPO_PUBLIC_FIREBASE_PROJECT_ID=${{ secrets.EXPO_PUBLIC_FIREBASE_PROJECT_ID }}
-          EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET=${{ secrets.EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET }}
-          EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=${{ secrets.EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID }}
-          EXPO_PUBLIC_FIREBASE_APP_ID=${{ secrets.EXPO_PUBLIC_FIREBASE_APP_ID }}
-          EXPO_PUBLIC_API_BASE_URL=${{ secrets.EXPO_PUBLIC_API_BASE_URL }}
-          EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID=${{ secrets.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID }}
-          EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID=${{ secrets.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID }}
-          EXPO_PUBLIC_PLAID_ENV=sandbox
-          EXPO_PUBLIC_PLAID_ANDROID_PACKAGE_NAME=com.na5h13.keel
-          EXPO_PUBLIC_DEV_MODE=true
-          ENVEOF
+          echo "EXPO_PUBLIC_PLAID_ENV=sandbox" > .env
+          echo "EXPO_PUBLIC_PLAID_ANDROID_PACKAGE_NAME=com.na5h13.keel" >> .env
+          echo "EXPO_PUBLIC_DEV_MODE=true" >> .env
+          echo "EXPO_PUBLIC_FIREBASE_API_KEY=${{ secrets.EXPO_PUBLIC_FIREBASE_API_KEY }}" >> .env
+          echo "EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN=${{ secrets.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN }}" >> .env
+          echo "EXPO_PUBLIC_FIREBASE_PROJECT_ID=${{ secrets.EXPO_PUBLIC_FIREBASE_PROJECT_ID }}" >> .env
+          echo "EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET=${{ secrets.EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET }}" >> .env
+          echo "EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=${{ secrets.EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID }}" >> .env
+          echo "EXPO_PUBLIC_FIREBASE_APP_ID=${{ secrets.EXPO_PUBLIC_FIREBASE_APP_ID }}" >> .env
+          echo "EXPO_PUBLIC_API_BASE_URL=${{ secrets.EXPO_PUBLIC_API_BASE_URL }}" >> .env
+          echo "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID=${{ secrets.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID }}" >> .env
+          echo "EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID=${{ secrets.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID }}" >> .env
 
       - name: Write google-services.json
-        run: echo '${{ secrets.GOOGLE_SERVICES_JSON }}' > google-services.json
+        env:
+          GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
+        run: printenv GOOGLE_SERVICES_JSON > google-services.json
 
       - name: Expo prebuild
         run: npx expo prebuild --platform android --no-install
