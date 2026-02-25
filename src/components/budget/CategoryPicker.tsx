@@ -1,272 +1,246 @@
-// src/components/budget/CategoryPicker.tsx
-// Function 3 — Category reassignment bottom sheet.
-// Slides up when user taps a transaction.
-// POSTs to /api/transactions/{id}/category on select.
+// Category Bottom Sheet — OpenSpec Section 21, Function 3
+// Tap transaction → category picker → optional "Apply to all {merchant}" checkbox
+// Creates CategoryRule on "Apply to all" selection
 
-import React, { useRef, useEffect, useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   View,
-  Text,
-  StyleSheet,
   Modal,
   TouchableOpacity,
-  ScrollView,
-  Animated,
   TouchableWithoutFeedback,
-  ActivityIndicator,
+  StyleSheet,
+  ScrollView,
+  Switch,
+  Pressable,
 } from 'react-native';
-import { colors, spacing, borderRadius, typography, shadows } from '@/src/theme';
-import { api } from '@/src/services/api';
-
-interface Transaction {
-  transaction_id: string;
-  name: string;
-  merchant: string;
-  amount: number;
-  budget_category: string;
-}
+import { GlassCard } from '@/src/components/ui/Glass';
+import { ScreenName, BodyText, BodyBold, Sublabel } from '@/src/components/ui/Typography';
+import { AmountText } from '@/src/components/ui/AmountText';
+import { colors, spacing, fonts, glass } from '@/src/theme';
+import { Category, Transaction } from '@/src/types';
+import { truncateMerchant } from '@/src/utils/formatAmount';
 
 interface CategoryPickerProps {
-  transaction: Transaction;
-  onAssign: (txnId: string, newCategory: string) => void;
-  onDismiss: () => void;
+  visible: boolean;
+  transaction: Transaction | null;
+  categories: Category[];
+  onSelect: (categoryId: string, applyToAll: boolean) => void;
+  onClose: () => void;
 }
 
-// Master category list — mirrors backend services/categories.py BUDGET_ENVELOPES
-const BUDGET_CATEGORIES = [
-  { section: 'Income', items: ['Income', 'Freelance', 'Side Income'] },
-  { section: 'Housing', items: ['Rent', 'Mortgage', 'Maintenance', 'Insurance'] },
-  { section: 'Food', items: ['Groceries', 'Dining Out', 'Coffee', 'Alcohol'] },
-  { section: 'Transport', items: ['Transit', 'Gas', 'Parking', 'Car Insurance', 'Ride Share'] },
-  { section: 'Bills', items: ['Utilities', 'Internet', 'Phone', 'Subscriptions'] },
-  { section: 'Health', items: ['Healthcare', 'Pharmacy', 'Fitness', 'Mental Health'] },
-  { section: 'Shopping', items: ['Clothing', 'Electronics', 'Home', 'Personal Care'] },
-  { section: 'Entertainment', items: ['Entertainment', 'Hobbies', 'Travel', 'Gifts'] },
-  { section: 'Finance', items: ['Savings', 'Investment', 'Debt Payment', 'Transfer', 'Fees'] },
-  { section: 'Other', items: ['Miscellaneous', 'Cash', 'Unknown'] },
-];
+export function CategoryPicker({
+  visible,
+  transaction,
+  categories,
+  onSelect,
+  onClose,
+}: CategoryPickerProps) {
+  const [applyToAll, setApplyToAll] = useState(false);
 
-export function CategoryPicker({ transaction, onAssign, onDismiss }: CategoryPickerProps) {
-  const slideAnim = useRef(new Animated.Value(400)).current;
-  const [saving, setSaving] = useState(false);
+  const handleSelect = useCallback((categoryId: string) => {
+    onSelect(categoryId, applyToAll);
+    setApplyToAll(false);
+  }, [onSelect, applyToAll]);
 
-  useEffect(() => {
-    Animated.spring(slideAnim, {
-      toValue: 0,
-      tension: 65,
-      friction: 11,
-      useNativeDriver: true,
-    }).start();
-  }, []);
+  const handleClose = useCallback(() => {
+    setApplyToAll(false);
+    onClose();
+  }, [onClose]);
 
-  function dismiss() {
-    Animated.timing(slideAnim, {
-      toValue: 400,
-      duration: 220,
-      useNativeDriver: true,
-    }).start(onDismiss);
-  }
+  if (!transaction) return null;
 
-  async function handleSelect(category: string) {
-    setSaving(true);
-    try {
-      await api.put(`/api/transactions/${transaction.transaction_id}/category`, {
-        category,
-      });
-    } catch {
-      // Optimistic update even if backend fails in DEV
-    } finally {
-      setSaving(false);
-      onAssign(transaction.transaction_id, category);
-    }
-  }
-
-  const isNegative = transaction.amount >= 0;
-  const displayAmount = `${isNegative ? '-' : '+'}$${Math.abs(transaction.amount).toFixed(2)}`;
+  const merchantName = transaction.display_merchant || transaction.merchant_name || transaction.name;
 
   return (
-    <Modal transparent animationType="none" onRequestClose={dismiss}>
-      <TouchableWithoutFeedback onPress={dismiss}>
-        <View style={styles.backdrop} />
-      </TouchableWithoutFeedback>
+    <Modal
+      visible={visible}
+      transparent
+      animationType="slide"
+      onRequestClose={handleClose}
+    >
+      <TouchableWithoutFeedback onPress={handleClose}>
+        <View style={styles.overlay}>
+          <TouchableWithoutFeedback>
+            <View style={styles.sheet}>
+              <View style={styles.sheetInner}>
+                {/* Handle bar */}
+                <View style={styles.handleBar} />
 
-      <Animated.View
-        style={[styles.sheet, { transform: [{ translateY: slideAnim }] }]}
-      >
-        {/* Handle */}
-        <View style={styles.handle} />
+                {/* Transaction info */}
+                <View style={styles.txnInfo}>
+                  <BodyBold numberOfLines={1}>{truncateMerchant(merchantName)}</BodyBold>
+                  <AmountText cents={transaction.amount} fontSize={16} />
+                </View>
 
-        {/* Transaction summary */}
-        <View style={styles.txnSummary}>
-          <View>
-            <Text style={styles.txnName} numberOfLines={1}>
-              {transaction.merchant || transaction.name}
-            </Text>
-            <Text style={styles.currentCat}>
-              Currently: <Text style={styles.currentCatValue}>{transaction.budget_category}</Text>
-            </Text>
-          </View>
-          <Text style={[styles.txnAmount, isNegative ? styles.debit : styles.income]}>
-            {displayAmount}
-          </Text>
-        </View>
+                {/* Category list */}
+                <Sublabel style={styles.sectionLabel}>SELECT CATEGORY</Sublabel>
+                <ScrollView
+                  style={styles.categoryList}
+                  showsVerticalScrollIndicator={false}
+                >
+                  {categories
+                    .filter(c => !c.is_income)
+                    .sort((a, b) => a.sort_order - b.sort_order)
+                    .map((category) => (
+                      <TouchableOpacity
+                        key={category.id}
+                        style={[
+                          styles.categoryRow,
+                          transaction.category_id === category.id && styles.categoryRowActive,
+                        ]}
+                        onPress={() => handleSelect(category.id)}
+                        activeOpacity={0.6}
+                      >
+                        <BodyText
+                          style={[
+                            styles.categoryName,
+                            transaction.category_id === category.id && styles.categoryNameActive,
+                          ]}
+                        >
+                          {category.name}
+                        </BodyText>
+                        {transaction.category_id === category.id && (
+                          <View style={styles.checkmark}>
+                            <BodyText style={styles.checkmarkText}>✓</BodyText>
+                          </View>
+                        )}
+                      </TouchableOpacity>
+                    ))}
+                </ScrollView>
 
-        <Text style={styles.sectionTitle}>Reassign to…</Text>
-
-        <ScrollView style={styles.list} showsVerticalScrollIndicator={false}>
-          {BUDGET_CATEGORIES.map(({ section, items }) => (
-            <View key={section} style={styles.categorySection}>
-              <Text style={styles.sectionHeader}>{section}</Text>
-              <View style={styles.categoryGrid}>
-                {items.map((cat) => (
-                  <TouchableOpacity
-                    key={cat}
-                    style={[
-                      styles.categoryChip,
-                      transaction.budget_category === cat && styles.categoryChipActive,
-                    ]}
-                    onPress={() => handleSelect(cat)}
-                    disabled={saving}
+                {/* Apply to all checkbox */}
+                <View style={styles.applyAllRow}>
+                  <Pressable
+                    onPress={() => setApplyToAll(!applyToAll)}
+                    style={styles.applyAllPressable}
                   >
-                    <Text
-                      style={[
-                        styles.categoryChipText,
-                        transaction.budget_category === cat && styles.categoryChipTextActive,
-                      ]}
-                    >
-                      {cat}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
+                    <View style={[styles.checkbox, applyToAll && styles.checkboxActive]}>
+                      {applyToAll && <BodyText style={styles.checkboxMark}>✓</BodyText>}
+                    </View>
+                    <BodyText style={styles.applyAllText}>
+                      Apply to all from "{truncateMerchant(merchantName)}"
+                    </BodyText>
+                  </Pressable>
+                </View>
               </View>
             </View>
-          ))}
-          <View style={{ height: 40 }} />
-        </ScrollView>
-
-        {saving && (
-          <View style={styles.savingOverlay}>
-            <ActivityIndicator color={colors.brand.deepSage} />
-          </View>
-        )}
-      </Animated.View>
+          </TouchableWithoutFeedback>
+        </View>
+      </TouchableWithoutFeedback>
     </Modal>
   );
 }
 
 const styles = StyleSheet.create({
-  backdrop: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(58, 74, 63, 0.35)',
+  overlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.3)',
+    justifyContent: 'flex-end',
   },
   sheet: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
     backgroundColor: colors.bg.eggshell,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    maxHeight: '75%',
-    paddingTop: spacing.sm,
-    ...shadows.lg,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    maxHeight: '70%',
   },
-  handle: {
+  sheetInner: {
+    padding: spacing.xxl,
+    paddingBottom: 40,
+  },
+  handleBar: {
     width: 36,
     height: 4,
-    borderRadius: 2,
     backgroundColor: colors.brand.softTaupe,
+    borderRadius: 2,
     alignSelf: 'center',
-    marginBottom: spacing.md,
+    marginBottom: spacing.xl,
   },
-  txnSummary: {
+  txnInfo: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: spacing.xl,
+    paddingBottom: spacing.lg,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.brand.softTaupe,
+  },
+  sectionLabel: {
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+    marginBottom: spacing.md,
+    fontSize: 10,
+    fontFamily: fonts.bodyBold,
+    fontWeight: '600',
+    color: colors.data.neutral,
+  },
+  categoryList: {
+    maxHeight: 300,
+  },
+  categoryRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    paddingVertical: 12,
     paddingHorizontal: spacing.lg,
-    paddingBottom: spacing.md,
-    borderBottomWidth: 0.5,
-    borderBottomColor: colors.brand.softTaupe,
-    marginBottom: spacing.md,
+    borderRadius: 10,
+    marginBottom: 2,
   },
-  txnName: {
-    fontSize: typography.size.md,
+  categoryRowActive: {
+    backgroundColor: 'rgba(58,74,63,0.08)',
+  },
+  categoryName: {
+    fontSize: 14,
+  },
+  categoryNameActive: {
+    fontFamily: fonts.bodyBold,
     fontWeight: '600',
-    color: colors.text.primary,
-    maxWidth: 220,
+    color: colors.brand.deepSage,
   },
-  currentCat: {
-    fontSize: typography.size.sm,
-    color: colors.data.neutral,
-    marginTop: 2,
+  checkmark: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: colors.brand.deepSage,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  currentCatValue: {
-    color: colors.brand.steelBlue,
-    fontWeight: '600',
-  },
-  txnAmount: {
-    fontSize: typography.size.lg,
+  checkmarkText: {
+    color: '#fff',
+    fontSize: 12,
     fontWeight: '700',
-    fontFamily: typography.fontFamily.mono,
   },
-  income: { color: colors.data.surplus },
-  debit: { color: colors.text.primary },
-  sectionTitle: {
-    fontSize: typography.size.sm,
-    fontWeight: '700',
-    color: colors.data.neutral,
-    textTransform: 'uppercase',
-    letterSpacing: 0.8,
-    paddingHorizontal: spacing.lg,
-    marginBottom: spacing.md,
+  applyAllRow: {
+    marginTop: spacing.xl,
+    paddingTop: spacing.lg,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.brand.softTaupe,
   },
-  list: {
-    flex: 1,
-    paddingHorizontal: spacing.lg,
-  },
-  categorySection: {
-    marginBottom: spacing.md,
-  },
-  sectionHeader: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: colors.brand.warmNude,
-    textTransform: 'uppercase',
-    letterSpacing: 1,
-    marginBottom: spacing.sm,
-  },
-  categoryGrid: {
+  applyAllPressable: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.sm,
+    alignItems: 'center',
+    gap: spacing.lg,
   },
-  categoryChip: {
-    paddingHorizontal: spacing.md,
-    paddingVertical: 8,
-    borderRadius: borderRadius.full,
-    backgroundColor: 'rgba(255,255,255,0.55)',
-    borderWidth: 1,
+  checkbox: {
+    width: 20,
+    height: 20,
+    borderRadius: 4,
+    borderWidth: 1.5,
     borderColor: colors.brand.softTaupe,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  categoryChipActive: {
+  checkboxActive: {
     backgroundColor: colors.brand.deepSage,
     borderColor: colors.brand.deepSage,
   },
-  categoryChipText: {
+  checkboxMark: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  applyAllText: {
+    flex: 1,
     fontSize: 13,
-    fontWeight: '500',
-    color: colors.text.primary,
-  },
-  categoryChipTextActive: {
-    color: colors.text.inverse,
-    fontWeight: '600',
-  },
-  savingOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(245,242,238,0.6)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
+    color: colors.brand.deepSage,
   },
 });

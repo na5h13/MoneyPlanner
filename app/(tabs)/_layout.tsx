@@ -1,111 +1,80 @@
-// app/(tabs)/_layout.tsx
-// Tab navigation — DEV_MODE shows ALL tabs simultaneously.
-// Production: phase-gated via useFeatureAccess().
+// 3-Tab Bottom Bar — Budget | Transactions | Settings
+// Per OpenSpec Navigation spec:
+// - Active: deep sage filled SVG
+// - Inactive: neutral outlined SVG
+// - Bar: 54px, backdrop blur
+// - Icons: 18x18px inline SVG — NO EMOJI
 
+import React from 'react';
 import { Tabs } from 'expo-router';
-import { colors } from '@/src/theme';
-import { useFeatureAccess } from '@/src/hooks/useFeatureAccess';
-import {
-  HomeIcon,
-  BudgetIcon,
-  TransactionsIcon,
-  GoalsIcon,
-  IINIcon,
-  SettingsIcon,
-} from '@/src/components/ui/TabIcons';
+import { View, StyleSheet, Platform } from 'react-native';
+import { BlurView } from 'expo-blur';
+import { WalletIcon, ReceiptIcon, GearIcon } from '@/src/components/ui/NavIcons';
+import { colors, nav, fonts, shadows } from '@/src/theme';
 
-export default function TabsLayout() {
-  const access = useFeatureAccess();
-
+export default function TabLayout() {
   return (
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarStyle: {
-          backgroundColor: 'rgba(245, 242, 238, 0.92)',
-          borderTopColor: 'rgba(214, 206, 195, 0.6)',
-          borderTopWidth: 0.5,
-          height: 88,
-          paddingBottom: 28,
-          paddingTop: 10,
-        },
+        tabBarStyle: styles.tabBar,
+        tabBarBackground: () => (
+          <BlurView
+            intensity={28}
+            tint="light"
+            style={StyleSheet.absoluteFill}
+          />
+        ),
         tabBarActiveTintColor: colors.brand.deepSage,
         tabBarInactiveTintColor: colors.data.neutral,
-        tabBarLabelStyle: {
-          fontSize: 10,
-          fontWeight: '600',
-          letterSpacing: 0.2,
-        },
+        tabBarLabelStyle: styles.tabLabel,
+        tabBarIconStyle: styles.tabIcon,
       }}
     >
-      {/* Home — Phase 4+ */}
-      <Tabs.Screen
-        name="index"
-        options={{
-          title: 'Home',
-          href: access.showHome ? undefined : null,
-          tabBarIcon: ({ color, focused }) => (
-            <HomeIcon color={color} filled={focused} size={22} />
-          ),
-        }}
-      />
-
-      {/* Budget — always visible */}
       <Tabs.Screen
         name="budget"
         options={{
           title: 'Budget',
-          tabBarIcon: ({ color, focused }) => (
-            <BudgetIcon color={color} filled={focused} size={22} />
-          ),
+          tabBarIcon: ({ focused }) => <WalletIcon active={focused} size={nav.iconSize} />,
         }}
       />
-
-      {/* Transactions — always visible */}
       <Tabs.Screen
         name="transactions"
         options={{
-          title: 'Activity',
-          tabBarIcon: ({ color, focused }) => (
-            <TransactionsIcon color={color} filled={focused} size={22} />
-          ),
+          title: 'Transactions',
+          tabBarIcon: ({ focused }) => <ReceiptIcon active={focused} size={nav.iconSize} />,
         }}
       />
-
-      {/* Goals — Phase 3+ */}
-      <Tabs.Screen
-        name="goals"
-        options={{
-          title: 'Goals',
-          href: access.showGoals ? undefined : null,
-          tabBarIcon: ({ color, focused }) => (
-            <GoalsIcon color={color} filled={focused} size={22} />
-          ),
-        }}
-      />
-
-      {/* IIN — Phase 5 + feature flag */}
-      <Tabs.Screen
-        name="iin"
-        options={{
-          title: 'IIN',
-          href: access.showIIN ? undefined : null,
-          tabBarIcon: ({ color, focused }) => (
-            <IINIcon color={color} filled={focused} size={22} />
-          ),
-        }}
-      />
-
-      {/* Settings — always visible */}
       <Tabs.Screen
         name="settings"
         options={{
           title: 'Settings',
-          tabBarIcon: ({ color, focused }) => (
-            <SettingsIcon color={color} filled={focused} size={22} />
-          ),
+          tabBarIcon: ({ focused }) => <GearIcon active={focused} size={nav.iconSize} />,
         }}
       />
     </Tabs>
   );
 }
+
+const styles = StyleSheet.create({
+  tabBar: {
+    position: 'absolute',
+    height: nav.barHeight + (Platform.OS === 'ios' ? 20 : 0),
+    paddingBottom: Platform.OS === 'ios' ? 20 : 0,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255,255,255,0.50)',
+    backgroundColor: 'rgba(235,231,224,0.45)',
+    ...shadows.navBar,
+    elevation: 0,
+  },
+  tabLabel: {
+    fontFamily: fonts.bodyBold,
+    fontSize: 8,
+    fontWeight: '600',
+    letterSpacing: 0.2,
+    marginTop: 0,
+  },
+  tabIcon: {
+    marginBottom: -2,
+  },
+});

@@ -1,148 +1,177 @@
-// src/types/index.ts
-// Core types for MoneyPlanner
+// OpenSpec v1.0 Data Schemas — Section 21 (Budget Tracker) + Section 22 (Trending)
+// All amounts stored as cents (integer) to avoid floating-point precision.
 
-// ============================================================
-// USER
-// ============================================================
-
-export interface UserProfile {
-  uid: string;
-  email: string;
-  displayName: string | null;
-  photoURL: string | null;
-  createdAt: string;
-  onboardingComplete: boolean;
-  settings: UserSettings;
-}
-
-export interface UserSettings {
-  currency: string; // ISO 4217 (e.g., 'CAD', 'USD')
-  notificationsEnabled: boolean;
-  automationLevel: 'full' | 'suggest' | 'manual'; // How much IIN automates
-  incomeCheckFrequency: 'weekly' | 'biweekly' | 'monthly';
-}
-
-// ============================================================
-// BUDGET
-// ============================================================
-
-export interface Budget {
+export interface Account {
   id: string;
-  userId: string;
+  user_id: string;
+  plaid_account_id: string;
   name: string;
-  period: BudgetPeriod;
-  categories: BudgetCategory[];
-  totalIncome: number;
-  totalAllocated: number;
-  createdAt: string;
-  updatedAt: string;
-}
-
-export type BudgetPeriod = 'weekly' | 'biweekly' | 'monthly';
-
-export interface BudgetCategory {
-  id: string;
-  name: string;
-  icon: string;
-  allocated: number; // Amount allocated to this category
-  spent: number; // Amount spent (from Plaid transactions)
-  type: CategoryType;
-  isAutomated: boolean; // Whether IIN manages this allocation
-}
-
-export type CategoryType = 'need' | 'want' | 'savings' | 'investment';
-
-// ============================================================
-// IIN (Income Increase Neutralization)
-// ============================================================
-
-export interface IINConfig {
-  id: string;
-  userId: string;
-  enabled: boolean;
-  baselineIncome: number; // Income when IIN was set up
-  currentIncome: number; // Latest detected income
-  rules: IINRule[];
-  history: IINEvent[];
-}
-
-export interface IINRule {
-  id: string;
-  name: string;
-  percentage: number; // % of income increase to redirect
-  targetType: 'savings' | 'investment' | 'debt' | 'category';
-  targetId: string; // ID of the target account/category
-  priority: number; // Order of execution (1 = first)
-  isActive: boolean;
-}
-
-export interface IINEvent {
-  id: string;
-  timestamp: string;
-  previousIncome: number;
-  newIncome: number;
-  increaseAmount: number;
-  allocations: IINAllocation[];
-  status: 'applied' | 'pending_review' | 'dismissed';
-}
-
-export interface IINAllocation {
-  ruleId: string;
-  ruleName: string;
-  amount: number;
-  targetType: string;
-  targetId: string;
-}
-
-// ============================================================
-// PLAID / BANKING
-// ============================================================
-
-export interface ConnectedAccount {
-  id: string;
-  userId: string;
-  institutionId: string;
-  institutionName: string;
-  institutionLogo: string | null;
-  accountName: string;
-  accountType: string;
-  accountSubtype: string;
-  mask: string; // Last 4 digits
-  currentBalance: number | null;
-  availableBalance: number | null;
-  lastSynced: string;
-  isActive: boolean;
+  official_name: string | null;
+  type: string;        // depository, credit, loan, investment
+  subtype: string;     // checking, savings, credit card, etc.
+  mask: string;        // last 4 digits
+  balance_current: number;   // cents
+  balance_available: number | null; // cents
+  balance_limit: number | null;     // cents (credit)
+  hidden: boolean;
+  last_synced_at: string;    // ISO timestamp
 }
 
 export interface Transaction {
   id: string;
-  accountId: string;
-  amount: number;
-  date: string;
+  plaid_transaction_id: string;
+  user_id: string;
+  account_id: string;
+  amount: number;            // cents — positive = debit, negative = credit (Plaid convention)
+  date: string;              // YYYY-MM-DD
   name: string;
-  merchantName: string | null;
-  category: string[];
+  merchant_name: string | null;
   pending: boolean;
-  budgetCategoryId: string | null; // Linked to a BudgetCategory
+  payment_channel: string;   // online, in store, other
+  plaid_category: string[];
+  category_id: string | null;
+  category_confidence: number; // 0.0 - 1.0
+  is_recurring: boolean;
+  is_income: boolean;
+  display_merchant: string;
+  synced_at: string;
+  categorized_at: string | null;
+  categorized_by: 'auto' | 'user' | null;
 }
 
-export interface IncomeStream {
+export interface Category {
+  id: string;
+  user_id: string;
   name: string;
-  amount: number;
-  frequency: string;
-  lastDetected: string;
-  confidence: number; // 0-1
+  icon: string;        // SVG identifier
+  sort_order: number;
+  is_default: boolean;
+  is_income: boolean;
+  includes: string[];  // keywords for matching
+  created_at: string;
+  updated_at: string;
 }
 
-// ============================================================
-// NAVIGATION
-// ============================================================
+export interface CategoryRule {
+  id: string;
+  user_id: string;
+  normalized_merchant: string;
+  category_id: string;
+  created_from_txn: string;  // transaction ID
+  created_at: string;
+  updated_at: string;
+}
 
-export type RootStackParamList = {
-  '(auth)/login': undefined;
-  '(auth)/onboarding': undefined;
-  '(tabs)': undefined;
-  '(modals)/connect-bank': undefined;
-  '(modals)/iin-setup': undefined;
-  '(modals)/iin-review': { eventId: string };
-};
+export interface BudgetTarget {
+  id: string;
+  user_id: string;
+  category_id: string;
+  period_type: 'monthly' | 'weekly' | 'biweekly';
+  period_start: string;      // YYYY-MM
+  target_amount: number;     // cents
+  is_suggested: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface BudgetLineItem {
+  id: string;
+  user_id: string;
+  category_id: string;
+  display_name: string;
+  linked_merchant: string | null;
+  budget_amount: number;     // cents
+  source: 'auto' | 'user';
+  is_active: boolean;
+  renamed_by_user: boolean;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+  deleted_at: string | null;
+}
+
+export interface UserSettings {
+  user_id: string;
+  budget_period: 'monthly' | 'weekly' | 'biweekly';
+  currency: string;
+  notifications_enabled: boolean;
+  plaid_access_token: string | null;   // encrypted
+  plaid_item_id: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+// Trending Classification (Section 22)
+export type ClassificationType = 'FIXED' | 'RECURRING_VARIABLE' | 'TRUE_VARIABLE' | 'UNCLASSIFIED';
+export type ClassificationSource = 'AUTO_DETECTED' | 'USER_OVERRIDE';
+
+export interface SpendingClassification {
+  id: string;
+  user_id: string;
+  merchant_normalized: string;
+  category_id: string;
+  classification_type: ClassificationType;
+  source: ClassificationSource;
+  confidence: number;
+  expected_amount: number | null;       // cents (FIXED)
+  expected_day: number | null;          // day of month (FIXED)
+  amount_range_low: number | null;      // cents (RECURRING_VARIABLE)
+  amount_range_high: number | null;     // cents (RECURRING_VARIABLE)
+  reclassification_flag: boolean;
+  last_evaluated: string;
+  created_at: string;
+  updated_at: string;
+}
+
+// Trending status for budget display
+export type TrendingStatus = 'ON_TRACK' | 'WATCH' | 'OVER' | 'INSUFFICIENT_DATA' | 'NO_TARGET';
+
+export interface TrendingData {
+  category_id: string;
+  spent_so_far: number;       // cents
+  projected: number;          // cents
+  target: number;             // cents
+  status: TrendingStatus;
+  days_elapsed: number;
+  days_in_period: number;
+}
+
+// Budget display composite
+export interface BudgetCategoryDisplay {
+  category: Category;
+  target: BudgetTarget | null;
+  line_items: BudgetLineItem[];
+  spent: number;              // cents
+  trending: TrendingData | null;
+  is_collapsed: boolean;
+}
+
+// Transaction filter state
+export type TransactionFilter = 'all' | 'income' | 'pending';
+
+// API response wrappers
+export interface ApiResponse<T> {
+  data: T;
+  error?: string;
+}
+
+export interface PaginatedResponse<T> {
+  data: T[];
+  total: number;
+  page: number;
+  per_page: number;
+}
+
+// Budget period for navigation
+export interface BudgetPeriod {
+  year: number;
+  month: number;   // 1-12
+  label: string;   // "January 2026"
+}
+
+// Sync status
+export interface SyncStatus {
+  last_synced_at: string | null;
+  is_syncing: boolean;
+  error: string | null;
+}

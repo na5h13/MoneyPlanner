@@ -1,148 +1,87 @@
-// src/components/budget/SummaryBar.tsx
-// Function 7 — Budget summary bar.
-// Safe-to-spend hero metric (glass-strong card, surplus glow).
-// Income / Committed / One-time breakdown (glass-inset cells).
-// Section 21, Function 7.
+// Summary Bar placeholder — OpenSpec Section 21, Function 7
+// Hero: SAFE TO SPEND = Income - Committed
+// Breakdown: INCOME | COMMITTED | ONE-TIME
+// Glass-strong with glow border
 
 import React from 'react';
-import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
-import { GlassCard } from '@/src/components/ui/GlassCard';
-import { colors, spacing, typography, borderRadius, shadows } from '@/src/theme';
+import { View, StyleSheet } from 'react-native';
+import { GlassCard } from '@/src/components/ui/Glass';
+import { HeroText, SectionHeader, Sublabel, DataText } from '@/src/components/ui/Typography';
+import { colors, spacing, fonts } from '@/src/theme';
+import { formatAmount, amountColor } from '@/src/utils/formatAmount';
 
 interface SummaryBarProps {
-  income: number;
-  committed: number;
-  oneTime: number;
-  safeToSpend: number;
-  daysRemaining: number;
-  loading?: boolean;
+  income: number;       // cents
+  committed: number;    // cents
+  safeToSpend: number;  // cents
 }
 
-export function SummaryBar({
-  income,
-  committed,
-  oneTime,
-  safeToSpend,
-  daysRemaining,
-  loading = false,
-}: SummaryBarProps) {
-  const isPositive = safeToSpend >= 0;
-  const dailyRate = daysRemaining > 0 ? safeToSpend / daysRemaining : 0;
-
-  function fmt(n: number): string {
-    const abs = Math.abs(n);
-    if (abs >= 1000) return `${n < 0 ? '-' : ''}$${(abs / 1000).toFixed(1)}k`;
-    return `${n < 0 ? '-' : ''}$${abs.toFixed(0)}`;
-  }
-
+export function SummaryBar({ income, committed, safeToSpend }: SummaryBarProps) {
   return (
-    <View style={styles.wrapper}>
-      {/* Hero: safe-to-spend */}
-      <GlassCard
-        tier="strong"
-        shadow="md"
-        surplusGlow={isPositive}
-        style={styles.heroCard}
-      >
-        {loading ? (
-          <ActivityIndicator color={colors.brand.deepSage} />
-        ) : (
-          <>
-            <Text style={styles.heroLabel}>Safe to Spend</Text>
-            <Text style={[styles.heroAmount, isPositive ? styles.surplus : styles.deficit]}>
-              {fmt(safeToSpend)}
-            </Text>
-            <Text style={styles.heroSub}>
-              {daysRemaining > 0
-                ? `${fmt(dailyRate)}/day · ${daysRemaining} days left`
-                : 'End of period'}
-            </Text>
-          </>
-        )}
-      </GlassCard>
+    <GlassCard
+      tier="strong"
+      glow={safeToSpend > 0 ? 'surplus' : safeToSpend < 0 ? 'warning' : undefined}
+      style={styles.card}
+    >
+      <View style={styles.content}>
+        <SectionHeader style={styles.label}>SAFE TO SPEND</SectionHeader>
+        <HeroText style={{ color: amountColor(-safeToSpend) }}>
+          {formatAmount(-safeToSpend)}
+        </HeroText>
 
-      {/* Breakdown row */}
-      <View style={styles.breakdownRow}>
-        <BreakdownCell label="Income" amount={income} color={colors.data.surplus} />
-        <BreakdownCell label="Committed" amount={committed} color={colors.data.neutral} />
-        <BreakdownCell label="One-time" amount={oneTime} color={colors.data.warning} />
+        <View style={styles.breakdown}>
+          <View style={styles.breakdownItem}>
+            <Sublabel style={styles.breakdownLabel}>INCOME</Sublabel>
+            <DataText style={[styles.breakdownValue, { color: colors.data.surplus }]}>
+              {formatAmount(-income)}
+            </DataText>
+          </View>
+          <View style={styles.divider} />
+          <View style={styles.breakdownItem}>
+            <Sublabel style={styles.breakdownLabel}>COMMITTED</Sublabel>
+            <DataText style={[styles.breakdownValue, { color: colors.brand.deepSage }]}>
+              {formatAmount(committed)}
+            </DataText>
+          </View>
+        </View>
       </View>
-    </View>
-  );
-}
-
-function BreakdownCell({ label, amount, color }: { label: string; amount: number; color: string }) {
-  function fmt(n: number): string {
-    const abs = Math.abs(n);
-    if (abs >= 1000) return `$${(abs / 1000).toFixed(1)}k`;
-    return `$${abs.toFixed(0)}`;
-  }
-
-  return (
-    <GlassCard tier="inset" shadow="none" style={styles.breakdownCell}>
-      <Text style={styles.breakdownLabel}>{label}</Text>
-      <Text style={[styles.breakdownAmount, { color }]}>{fmt(amount)}</Text>
     </GlassCard>
   );
 }
 
 const styles = StyleSheet.create({
-  wrapper: {
-    paddingHorizontal: spacing.lg,
-    paddingBottom: spacing.md,
+  card: {
+    marginBottom: spacing.xl,
   },
-  heroCard: {
+  content: {
+    padding: spacing.xl,
     alignItems: 'center',
-    paddingVertical: spacing.xl,
-    paddingHorizontal: spacing.lg,
+  },
+  label: {
     marginBottom: spacing.sm,
   },
-  heroLabel: {
-    fontSize: typography.size.sm,
-    fontWeight: '700',
-    color: colors.data.neutral,
-    textTransform: 'uppercase',
-    letterSpacing: 1.2,
-    marginBottom: spacing.xs,
-  },
-  heroAmount: {
-    fontSize: 48,
-    fontWeight: '700',
-    fontFamily: typography.fontFamily.mono,
-    letterSpacing: -2,
-    marginBottom: 4,
-  },
-  surplus: {
-    color: colors.data.surplus,
-  },
-  deficit: {
-    color: colors.data.deficit,
-  },
-  heroSub: {
-    fontSize: typography.size.sm,
-    color: colors.data.neutral,
-    fontFamily: typography.fontFamily.mono,
-  },
-  breakdownRow: {
+  breakdown: {
     flexDirection: 'row',
-    gap: spacing.sm,
-  },
-  breakdownCell: {
-    flex: 1,
+    marginTop: spacing.lg,
+    gap: spacing.xl,
     alignItems: 'center',
-    paddingVertical: spacing.md,
+  },
+  breakdownItem: {
+    alignItems: 'center',
   },
   breakdownLabel: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: colors.data.neutral,
     textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    marginBottom: 4,
+    letterSpacing: 0.4,
+    fontSize: 8,
+    fontWeight: '600',
+    marginBottom: 2,
   },
-  breakdownAmount: {
-    fontSize: typography.size.lg,
-    fontWeight: '700',
-    fontFamily: typography.fontFamily.mono,
+  breakdownValue: {
+    fontSize: 13,
+  },
+  divider: {
+    width: 1,
+    height: 24,
+    backgroundColor: colors.brand.softTaupe,
   },
 });
