@@ -20,7 +20,9 @@
       "infoPlist": {
         "CFBundleURLTypes": [
           {
-            "CFBundleURLSchemes": ["moneyplanner"]
+            "CFBundleURLSchemes": [
+              "moneyplanner"
+            ]
           }
         ]
       }
@@ -42,18 +44,19 @@
       "expo-router",
       "@react-native-firebase/app",
       "@react-native-google-signin/google-signin",
-      [
-        "react-native-plaid-link-sdk",
-        {
-          "android": {
-            "plaidPackageName": "com.moneyplanner.app"
-          }
-        }
-      ],
-      "expo-secure-store"
+      "expo-secure-store",
+      "expo-asset"
     ],
     "experiments": {
       "typedRoutes": true
+    },
+    "extra": {
+      "router": {
+        "origin": false
+      },
+      "eas": {
+        "projectId": "2acef2d2-a363-4973-9b77-11c9482d9a81"
+      }
     }
   }
 }

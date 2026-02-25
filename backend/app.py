@@ -843,6 +843,72 @@ def create_app():
         from services.safeguards_service import start_gamification_holiday
         return jsonify(start_gamification_holiday(request.uid))
 
+
+    # --- Transaction Category Override (Function 3) ---
+
+    @app.route("/api/transactions/<transaction_id>/category", methods=["PUT"])
+    @verify_firebase_token_or_dev
+    def api_override_transaction_category(transaction_id):
+        """User reassigns a transaction to a different budget category."""
+        body = request.get_json() or {}
+        category = body.get("category")
+        if not category:
+            return jsonify({"error": "category required"}), 400
+        overrides_file = DATA_DIR / f"category_overrides_{request.uid}.json"
+        overrides = {}
+        if overrides_file.exists():
+            try:
+                overrides = json.loads(overrides_file.read_text())
+            except Exception:
+                overrides = {}
+        overrides[transaction_id] = {"category": category, "overridden_at": datetime.utcnow().isoformat()}
+        overrides_file.write_text(json.dumps(overrides, indent=2))
+        return jsonify({"transaction_id": transaction_id, "category": category, "status": "updated"})
+
+    @app.route("/api/budget/items", methods=["POST"])
+    @verify_firebase_token_or_dev
+    def api_create_budget_item():
+        body = request.get_json() or {}
+        item = {"id": body.get("id", f"item_{datetime.utcnow().timestamp()}"), "category_id": body.get("category_id"), "name": body.get("name", "New item"), "budget_amount": float(body.get("budget_amount", 0)), "classification": body.get("classification", "TRUE_VARIABLE"), "created_at": datetime.utcnow().isoformat()}
+        items_file = DATA_DIR / f"budget_items_{request.uid}.json"
+        items = json.loads(items_file.read_text()) if items_file.exists() else []
+        items.append(item)
+        items_file.write_text(json.dumps(items, indent=2))
+        return jsonify({"item": item, "status": "created"}), 201
+
+    @app.route("/api/budget/items/<item_id>", methods=["PUT"])
+    @verify_firebase_token_or_dev
+    def api_update_budget_item(item_id):
+        body = request.get_json() or {}
+        items_file = DATA_DIR / f"budget_items_{request.uid}.json"
+        items = json.loads(items_file.read_text()) if items_file.exists() else []
+        for item in items:
+            if item["id"] == item_id:
+                if body.get("name"): item["name"] = body["name"]
+                if body.get("budget_amount") is not None: item["budget_amount"] = float(body["budget_amount"])
+                if body.get("classification"): item["classification"] = body["classification"]
+                item["updated_at"] = datetime.utcnow().isoformat()
+                break
+        items_file.write_text(json.dumps(items, indent=2))
+        return jsonify({"status": "updated"})
+
+    @app.route("/api/budget/items/<item_id>", methods=["DELETE"])
+    @verify_firebase_token_or_dev
+    def api_delete_budget_item(item_id):
+        items_file = DATA_DIR / f"budget_items_{request.uid}.json"
+        items = json.loads(items_file.read_text()) if items_file.exists() else []
+        items = [i for i in items if i["id"] != item_id]
+        items_file.write_text(json.dumps(items, indent=2))
+        return jsonify({"status": "deleted"})
+
+    @app.route("/api/budget/items", methods=["GET"])
+    @verify_firebase_token_or_dev
+    def api_get_budget_items():
+        items_file = DATA_DIR / f"budget_items_{request.uid}.json"
+        items = json.loads(items_file.read_text()) if items_file.exists() else []
+        return jsonify({"items": items, "count": len(items)})
+
+
     # --- A/B Testing (Phase 5+) ---
 
     @app.route("/api/experiments")

@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "230366313824",
+    "project_id": "money-planner-ca2c0",
+    "storage_bucket": "money-planner-ca2c0.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:230366313824:android:8c4d1e7f02d5998349b205",
+        "android_client_info": {
+          "package_name": "com.na5h13.keel"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyC8bJ9MLwaSD0pSjvprnX4z65z_Y9idmPU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

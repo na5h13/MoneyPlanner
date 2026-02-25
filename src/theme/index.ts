@@ -1,66 +1,68 @@
 // src/theme/index.ts
-// MoneyPlanner Design System
-// Glassmorphism + green-only palette + dark-first
-// Core principle: green = healthy finances, less UI = better financial health
+// MoneyPlanner Design System — Glassmorphism v3.1
+// Light / nude palette. Less UI = better financial health.
+// Source of truth: OpenSpec_v1_0_Unified.md Section 12.1
 
 export const colors = {
-  // Background layers (dark, rich depth for glassmorphism)
+  brand: {
+    deepSage: '#3a4a3f',
+    steelBlue: '#51697a',
+    softTaupe: '#d6cec3',
+    warmNude: '#c1b19f',
+    celadon: '#a8c0a8',
+  },
+  data: {
+    surplus: '#5B8A72',
+    positiveLight: '#7496b0',
+    warning: '#9A7B4F',
+    deficit: '#8B7260',
+    neutral: '#8a8a8a',
+  },
   bg: {
-    primary: '#0A0F1C',
-    secondary: '#111827',
-    tertiary: '#1A2236',
+    eggshell: '#f5f2ee',
+    cloud: '#eef2f1',
+    linen: '#e8e3da',
+    misty: '#d8dede',
+    primary: '#f5f2ee',
+    secondary: '#eef2f1',
+    tertiary: '#e8e3da',
   },
-
-  // Green spectrum — the ONLY accent color family
-  green: {
-    50: '#ECFDF5',
-    100: '#D1FAE5',
-    200: '#A7F3D0',
-    300: '#6EE7B7',
-    400: '#34D399',
-    500: '#10B981', // Primary action color
-    600: '#059669',
-    700: '#047857',
-    800: '#065F46',
-    900: '#064E3B',
-  },
-
-  // Neutrals (for text, borders, subtle elements)
-  neutral: {
-    50: '#F9FAFB',
-    100: '#F3F4F6',
-    200: '#E5E7EB',
-    300: '#D1D5DB',
-    400: '#9CA3AF',
-    500: '#6B7280',
-    600: '#4B5563',
-    700: '#374151',
-    800: '#1F2937',
-    900: '#111827',
-  },
-
-  // Semantic (minimal use — only for system states)
-  semantic: {
-    error: '#EF4444',
-    warning: '#F59E0B',
-    info: '#3B82F6',
-  },
-
-  // Glassmorphism
   glass: {
-    background: 'rgba(255, 255, 255, 0.05)',
-    backgroundHover: 'rgba(255, 255, 255, 0.08)',
-    border: 'rgba(255, 255, 255, 0.10)',
-    borderLight: 'rgba(255, 255, 255, 0.15)',
+    background: 'rgba(255, 255, 255, 0.38)',
+    backgroundHover: 'rgba(255, 255, 255, 0.45)',
+    backgroundStrong: 'rgba(255, 255, 255, 0.52)',
+    backgroundInset: 'rgba(255, 255, 255, 0.15)',
+    border: 'rgba(255, 255, 255, 0.72)',
+    borderSubtle: 'rgba(255, 255, 255, 0.40)',
+    borderBottom: 'rgba(214, 206, 195, 0.5)',
   },
-
-  // Text
   text: {
-    primary: '#F9FAFB',
-    secondary: '#9CA3AF',
-    tertiary: '#6B7280',
-    inverse: '#0A0F1C',
-    accent: '#34D399',
+    primary: '#3a4a3f',
+    secondary: '#51697a',
+    tertiary: '#8a8a8a',
+    inverse: '#f5f2ee',
+    accent: '#5B8A72',
+  },
+  semantic: {
+    error: '#C0392B',
+    warning: '#9A7B4F',
+    success: '#5B8A72',
+    info: '#51697a',
+  },
+  // Legacy aliases for backwards compat
+  green: {
+    400: '#5B8A72',
+    500: '#5B8A72',
+  },
+  neutral: {
+    50: '#f5f2ee',
+    100: '#eef2f1',
+    200: '#e8e3da',
+    300: '#d6cec3',
+    400: '#c1b19f',
+    500: '#8a8a8a',
+    600: '#51697a',
+    700: '#3a4a3f',
   },
 } as const;
 
@@ -78,20 +80,19 @@ export const borderRadius = {
   sm: 8,
   md: 12,
   lg: 16,
-  xl: 24,
+  xl: 20,
+  '2xl': 28,
   full: 9999,
 } as const;
 
 export const typography = {
-  // Font families (system fonts — fast, no loading)
   fontFamily: {
+    display: 'Georgia', // Playfair Display fallback
     regular: 'System',
-    medium: 'System',
     semibold: 'System',
-    bold: 'System',
+    mono: 'Courier',
+    monoBold: 'Courier',
   },
-
-  // Type scale
   size: {
     xs: 11,
     sm: 13,
@@ -99,11 +100,10 @@ export const typography = {
     md: 17,
     lg: 20,
     xl: 24,
-    '2xl': 30,
-    '3xl': 36,
-    '4xl': 48,
+    '2xl': 28,
+    '3xl': 32,
+    '4xl': 40,
   },
-
   lineHeight: {
     tight: 1.2,
     normal: 1.5,
@@ -111,50 +111,54 @@ export const typography = {
   },
 } as const;
 
-// Glassmorphism card presets
 export const glassCard = {
   default: {
-    backgroundColor: colors.glass.background,
-    borderColor: colors.glass.border,
+    backgroundColor: 'rgba(255, 255, 255, 0.38)',
+    borderColor: 'rgba(255, 255, 255, 0.72)',
     borderWidth: 1,
     borderRadius: borderRadius.lg,
   },
-  elevated: {
-    backgroundColor: colors.glass.backgroundHover,
-    borderColor: colors.glass.borderLight,
+  strong: {
+    backgroundColor: 'rgba(255, 255, 255, 0.52)',
+    borderColor: 'rgba(255, 255, 255, 0.72)',
     borderWidth: 1,
     borderRadius: borderRadius.xl,
   },
+  inset: {
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    borderColor: 'rgba(255, 255, 255, 0.40)',
+    borderWidth: 1,
+    borderRadius: borderRadius.md,
+  },
 } as const;
 
-// Shadow presets (subtle, for depth without breaking glass effect)
 export const shadows = {
   sm: {
-    shadowColor: '#000',
+    shadowColor: '#3a4a3f',
     shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.15,
-    shadowRadius: 3,
+    shadowOpacity: 0.06,
+    shadowRadius: 4,
     elevation: 2,
   },
   md: {
-    shadowColor: '#000',
+    shadowColor: '#3a4a3f',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
     elevation: 4,
   },
   lg: {
-    shadowColor: '#000',
+    shadowColor: '#3a4a3f',
     shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.25,
-    shadowRadius: 16,
+    shadowOpacity: 0.10,
+    shadowRadius: 24,
     elevation: 8,
   },
-  glow: {
-    shadowColor: colors.green[500],
+  surplusGlow: {
+    shadowColor: '#5B8A72',
     shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.3,
-    shadowRadius: 12,
+    shadowOpacity: 0.25,
+    shadowRadius: 16,
     elevation: 6,
   },
 } as const;
