@@ -89,6 +89,22 @@ jobs:
       - name: Expo prebuild
         run: npx expo prebuild --platform android --no-install
 
+      - name: Patch Kotlin version for Compose Compiler compatibility
+        run: |
+          python3 << 'PYEOF'
+          with open('android/build.gradle', 'r') as f:
+              content = f.read()
+          # Compose Compiler 1.5.15 (used by expo-modules-core) requires Kotlin 1.9.25
+          # Expo prebuild generates kotlinVersion = "1.9.24" — bump it
+          patched = content.replace('kotlinVersion = "1.9.24"', 'kotlinVersion = "1.9.25"')
+          if patched == content:
+              print("WARNING: kotlinVersion = \"1.9.24\" not found — check if Expo updated the default")
+          else:
+              print("Patched kotlinVersion 1.9.24 → 1.9.25")
+          with open('android/build.gradle', 'w') as f:
+              f.write(patched)
+          PYEOF
+
       - name: Generate keystore
         run: |
           keytool -genkeypair \
