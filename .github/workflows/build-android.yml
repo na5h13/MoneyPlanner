@@ -78,42 +78,33 @@ jobs:
       - name: Patch build.gradle for signing
         run: |
           python3 << 'PYEOF'
-          import re
-
           with open('android/app/build.gradle', 'r') as f:
               content = f.read()
 
-          signing_config = """
-              signingConfigs {
-                  release {
+          # Add release signing config inside existing signingConfigs block
+          release_config = """        release {
                       storeFile file(MYAPP_UPLOAD_STORE_FILE)
                       storePassword MYAPP_UPLOAD_STORE_PASSWORD
                       keyAlias MYAPP_UPLOAD_KEY_ALIAS
                       keyPassword MYAPP_UPLOAD_KEY_PASSWORD
                   }
-              }
-          """
+              """
+          # Insert after the debug block's closing brace
+          content = content.replace(
+              "    signingConfigs {\n        debug {",
+              "    signingConfigs {\n" + release_config + "        debug {"
+          )
 
-          # Insert signingConfigs before buildTypes
-          if 'signingConfigs' not in content:
-              content = content.replace(
-                  '    buildTypes {',
-                  signing_config + '    buildTypes {',
-                  1
-              )
-
-          # Set release buildType to use signing config
-          content = re.sub(
-              r'(release\s*\{[^}]*?)(minifyEnabled\s+\w+)',
-              r'\1signingConfig signingConfigs.release\n            \2',
-              content,
-              count=1
+          # Point release buildType to signingConfigs.release instead of debug
+          content = content.replace(
+              "signingConfig signingConfigs.debug\n            shrinkResources",
+              "signingConfig signingConfigs.release\n            shrinkResources"
           )
 
           with open('android/app/build.gradle', 'w') as f:
               f.write(content)
 
-          print("build.gradle patched successfully")
+          print("build.gradle patched for release signing")
           PYEOF
 
       - name: Build release APK
