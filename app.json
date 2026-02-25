@@ -30,14 +30,6 @@
       "expo-asset",
       "@react-native-firebase/app",
       "@react-native-google-signin/google-signin",
-      [
-        "react-native-plaid-link-sdk",
-        {
-          "android": {
-            "plaidPackageName": "com.na5h13.keel"
-          }
-        }
-      ],
       "expo-secure-store"
     ],
     "experiments": {
