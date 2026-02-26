@@ -6,9 +6,8 @@
 
 import { Router, Request, Response } from 'express';
 import { getFirestore } from '../services/firebaseAdmin';
-import { syncTransactions } from '../services/plaidService';
-import { decrypt } from '../utils/encryption';
-import { categorizeTransaction, normalizeMerchant } from '../services/categorization';
+import { normalizeMerchant } from '../services/categorization';
+import { syncUserTransactions } from '../services/syncService';
 
 const router = Router();
 
@@ -175,104 +174,12 @@ router.put('/:id/category', async (req: Request, res: Response) => {
 // POST /api/v1/transactions/sync
 router.post('/sync', async (req: Request, res: Response) => {
   try {
-    const db = getFirestore();
-    const userId = req.uid;
-
-    // Get user's Plaid tokens
-    const settingsDoc = await db.collection('users').doc(userId).get();
-    const settings = settingsDoc.data();
-
-    if (!settings?.plaid_items || Object.keys(settings.plaid_items).length === 0) {
-      res.status(400).json({ error: 'No linked accounts' });
+    const result = await syncUserTransactions(req.uid);
+    if (result.errors.length > 0 && result.synced === 0) {
+      res.status(400).json({ error: result.errors[0] });
       return;
     }
-
-    let totalSynced = 0;
-
-    // Get categories for auto-categorization
-    const catSnap = await db.collection('users').doc(userId).collection('categories').get();
-    const categories = catSnap.docs.map(d => ({ id: d.id, ...d.data() })) as Array<{
-      id: string;
-      name: string;
-      includes: string[];
-    }>;
-
-    // Sync each linked item
-    for (const [itemId, itemData] of Object.entries(settings.plaid_items as Record<string, any>)) {
-      const accessToken = decrypt(itemData.access_token);
-      const cursor = itemData.cursor || '';
-
-      const result = await syncTransactions(accessToken, cursor);
-
-      const txnCollection = db.collection('users').doc(userId).collection('transactions');
-
-      // Process added transactions
-      for (const txn of result.added) {
-        const displayMerchant = normalizeMerchant(txn.merchant_name || txn.name);
-        const isIncome = txn.amount < 0; // Plaid: negative = money in
-
-        // Auto-categorize
-        const catResult = await categorizeTransaction(
-          userId,
-          txn.merchant_name || '',
-          txn.name,
-          txn.personal_finance_category,
-          categories
-        );
-
-        // Convert amount to cents (integer)
-        const amountCents = Math.round(txn.amount * 100);
-
-        await txnCollection.doc(txn.transaction_id).set({
-          plaid_transaction_id: txn.transaction_id,
-          user_id: userId,
-          account_id: txn.account_id,
-          amount: amountCents,
-          date: txn.date,
-          name: txn.name,
-          merchant_name: txn.merchant_name,
-          pending: txn.pending,
-          payment_channel: txn.payment_channel,
-          plaid_category: txn.personal_finance_category,
-          category_id: catResult.category_id,
-          category_confidence: catResult.confidence,
-          is_recurring: false, // Determined later by classification engine
-          is_income: isIncome,
-          display_merchant: displayMerchant,
-          synced_at: new Date().toISOString(),
-          categorized_at: new Date().toISOString(),
-          categorized_by: 'auto',
-        }, { merge: true });
-
-        totalSynced++;
-      }
-
-      // Process modified transactions
-      for (const txn of result.modified) {
-        const amountCents = Math.round(txn.amount * 100);
-        await txnCollection.doc(txn.transaction_id).update({
-          amount: amountCents,
-          date: txn.date,
-          name: txn.name,
-          merchant_name: txn.merchant_name,
-          pending: txn.pending,
-          synced_at: new Date().toISOString(),
-        });
-      }
-
-      // Process removed transactions
-      for (const txnId of result.removed) {
-        await txnCollection.doc(txnId).delete();
-      }
-
-      // Update cursor
-      await db.collection('users').doc(userId).update({
-        [`plaid_items.${itemId}.cursor`]: result.next_cursor,
-        [`plaid_items.${itemId}.last_sync`]: new Date().toISOString(),
-      });
-    }
-
-    res.json({ data: { synced: totalSynced } });
+    res.json({ data: { synced: result.synced } });
   } catch (err) {
     console.error('POST /transactions/sync error:', err);
     res.status(500).json({ error: 'Sync failed' });

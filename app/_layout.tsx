@@ -1,7 +1,8 @@
-// Root Layout — loads fonts, shows splash screen, renders slot
+// Root Layout — loads fonts, shows splash screen, sync-on-open, renders slot
 import React, { useEffect } from 'react';
 import { Slot } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
+import { useSyncOnOpen } from '@/src/hooks/useSyncOnOpen';
 import {
   useFonts,
   PlayfairDisplay_400Regular,
@@ -19,6 +20,8 @@ import {
 SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
+  useSyncOnOpen();
+
   const [fontsLoaded, fontError] = useFonts({
     PlayfairDisplay_400Regular,
     PlayfairDisplay_600SemiBold,

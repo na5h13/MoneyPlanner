@@ -13,6 +13,7 @@ import categoryRoutes from './routes/categories';
 import budgetRoutes from './routes/budget';
 import accountRoutes from './routes/accounts';
 import settingsRoutes from './routes/settings';
+import webhookRoutes from './routes/webhooks';
 
 const app = express();
 const PORT = parseInt(process.env.PORT || '5050', 10);
@@ -34,6 +35,9 @@ app.use(express.json());
 app.get('/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
+
+// Plaid webhooks — no auth (Plaid sends these)
+app.use('/api/v1/webhooks', webhookRoutes);
 
 // All API routes require auth
 app.use('/api/v1/transactions', authMiddleware, transactionRoutes);

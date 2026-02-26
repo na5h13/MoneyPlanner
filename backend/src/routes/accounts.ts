@@ -132,6 +132,12 @@ router.post('/exchange', async (req: Request, res: Response) => {
       },
     }, { merge: true });
 
+    // Write item_id → user_id index for webhook handler lookup
+    await db.collection('plaid_item_users').doc(result.item_id).set({
+      user_id: req.uid,
+      connected_at: new Date().toISOString(),
+    });
+
     res.json({ data: { item_id: result.item_id, success: true } });
   } catch (err) {
     console.error('POST /accounts/exchange error:', err);
