@@ -14,6 +14,7 @@ import budgetRoutes from './routes/budget';
 import accountRoutes from './routes/accounts';
 import settingsRoutes from './routes/settings';
 import webhookRoutes from './routes/webhooks';
+import classificationRoutes from './routes/classifications';
 
 const app = express();
 const PORT = parseInt(process.env.PORT || '5050', 10);
@@ -45,6 +46,7 @@ app.use('/api/v1/categories', authMiddleware, categoryRoutes);
 app.use('/api/v1/budget', authMiddleware, budgetRoutes);
 app.use('/api/v1/accounts', authMiddleware, accountRoutes);
 app.use('/api/v1/settings', authMiddleware, settingsRoutes);
+app.use('/api/v1/classifications', authMiddleware, classificationRoutes);
 
 // CSV export is under settings
 app.post('/api/v1/export', authMiddleware, async (req, res) => {

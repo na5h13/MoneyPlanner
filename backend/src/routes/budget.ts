@@ -49,6 +49,22 @@ router.get('/', async (req: Request, res: Response) => {
       .get();
     const allItems = itemSnap.docs.map(d => ({ id: d.id, ...d.data() }));
 
+    // Get spending classifications for merchant badge display (M8)
+    const classSnap = await db
+      .collection('users').doc(userId).collection('spending_classifications')
+      .get();
+    const classificationByMerchant = new Map<string, string>();
+    for (const doc of classSnap.docs) {
+      const data = doc.data();
+      if (data.merchant_normalized && data.classification_type) {
+        // User overrides take precedence
+        const existing = classificationByMerchant.get(data.merchant_normalized);
+        if (!existing || data.source === 'USER_OVERRIDE') {
+          classificationByMerchant.set(data.merchant_normalized, data.classification_type);
+        }
+      }
+    }
+
     // Get transactions for this month
     const startDate = `${year}-${String(month).padStart(2, '0')}-01`;
     const endMonth = month === 12 ? 1 : month + 1;
@@ -94,7 +110,14 @@ router.get('/', async (req: Request, res: Response) => {
     // Build display data
     const budgetDisplay = categories.map((cat: any) => {
       const target = targets.get(cat.id) as any;
-      const items = allItems.filter((item: any) => item.category_id === cat.id);
+      const items = allItems
+        .filter((item: any) => item.category_id === cat.id)
+        .map((item: any) => ({
+          ...item,
+          classification_type: item.linked_merchant
+            ? (classificationByMerchant.get(item.linked_merchant) || null)
+            : null,
+        }));
       const spent = spentByCategory.get(cat.id) || 0;
       const targetAmount = target?.target_amount || 0;
 

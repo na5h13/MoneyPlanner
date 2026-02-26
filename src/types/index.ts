@@ -88,6 +88,8 @@ export interface BudgetLineItem {
   created_at: string;
   updated_at: string;
   deleted_at: string | null;
+  // Display-only — joined from spending_classifications (M8)
+  classification_type?: ClassificationType;
 }
 
 export interface UserSettings {
@@ -101,9 +103,15 @@ export interface UserSettings {
   updated_at: string;
 }
 
-// Trending Classification (Section 22)
+// Trending Classification (Section 22 — M8)
 export type ClassificationType = 'FIXED' | 'RECURRING_VARIABLE' | 'TRUE_VARIABLE' | 'UNCLASSIFIED';
 export type ClassificationSource = 'AUTO_DETECTED' | 'USER_OVERRIDE';
+
+// Per-line-item classification for budget display
+export interface LineItemClassification {
+  type: ClassificationType;
+  source: ClassificationSource;
+}
 
 export interface SpendingClassification {
   id: string;

@@ -18,7 +18,7 @@ import {
   Sublabel,
 } from '@/src/components/ui/Typography';
 import { colors, spacing, fonts } from '@/src/theme';
-import { BudgetCategoryDisplay, BudgetLineItem, TrendingStatus } from '@/src/types';
+import { BudgetCategoryDisplay, BudgetLineItem, TrendingStatus, ClassificationType } from '@/src/types';
 import { formatAmount } from '@/src/utils/formatAmount';
 
 interface CategoryCardProps {
@@ -29,6 +29,17 @@ interface CategoryCardProps {
   onAddItem: (categoryId: string, name: string) => void;
   onRenameItem: (itemId: string, name: string) => void;
   onDeleteItem: (itemId: string) => void;
+  onReclassify?: (merchant: string, type: ClassificationType) => void;
+}
+
+// Classification badge labels (NNR-ICON: no emoji, text only)
+function classificationBadge(type: ClassificationType): string {
+  switch (type) {
+    case 'FIXED':              return 'FX';
+    case 'RECURRING_VARIABLE': return 'RV';
+    case 'TRUE_VARIABLE':      return 'TV';
+    default:                   return '';
+  }
 }
 
 // Status → color mapping (NNR-COLOR: NO RED ever)
@@ -62,6 +73,7 @@ export function CategoryCard({
   onAddItem,
   onRenameItem,
   onDeleteItem,
+  onReclassify,
 }: CategoryCardProps) {
   const { category, target, line_items, spent, trending } = data;
   const targetAmount = target?.target_amount || 0;
@@ -116,6 +128,22 @@ export function CategoryCard({
       ]
     );
   }, [onDeleteItem]);
+
+  // Long-press classification badge → reclassify sheet
+  const handleLongPressClassification = useCallback((item: BudgetLineItem) => {
+    if (!item.linked_merchant || !onReclassify) return;
+    const merchant = item.linked_merchant;
+    Alert.alert(
+      'Classify Spending',
+      `How does "${item.display_name}" typically post?`,
+      [
+        { text: 'Fixed (same amount every time)', onPress: () => onReclassify(merchant, 'FIXED') },
+        { text: 'Recurring Variable (varies monthly)', onPress: () => onReclassify(merchant, 'RECURRING_VARIABLE') },
+        { text: 'True Variable (irregular)', onPress: () => onReclassify(merchant, 'TRUE_VARIABLE') },
+        { text: 'Cancel', style: 'cancel' },
+      ]
+    );
+  }, [onReclassify]);
 
   const handleAddItem = useCallback(() => {
     if (newItemName.trim()) {
@@ -248,6 +276,17 @@ export function CategoryCard({
                     {item.display_name}
                   </BodySmall>
                 </View>
+                {item.classification_type && classificationBadge(item.classification_type) ? (
+                  <TouchableOpacity
+                    onLongPress={() => handleLongPressClassification(item)}
+                    activeOpacity={0.7}
+                    style={styles.classBadge}
+                  >
+                    <Sublabel style={styles.classBadgeText}>
+                      {classificationBadge(item.classification_type)}
+                    </Sublabel>
+                  </TouchableOpacity>
+                ) : null}
                 <DataText style={styles.lineItemAmount}>
                   {item.budget_amount ? formatAmount(-item.budget_amount) : '—'}
                 </DataText>
@@ -471,6 +510,20 @@ const styles = StyleSheet.create({
     textAlign: 'right',
     fontSize: 11,
     color: colors.brand.deepSage,
+  },
+  classBadge: {
+    borderWidth: 1,
+    borderColor: 'rgba(138,138,138,0.35)',
+    borderRadius: 3,
+    paddingHorizontal: 3,
+    paddingVertical: 1,
+    marginRight: 4,
+  },
+  classBadgeText: {
+    fontSize: 7,
+    color: colors.data.neutral,
+    fontWeight: '600',
+    letterSpacing: 0.3,
   },
   lineDeleteBtn: {
     width: 20,

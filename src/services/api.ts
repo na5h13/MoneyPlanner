@@ -170,6 +170,16 @@ export const accountApi = {
   disconnect: () => api.delete('/api/v1/accounts/disconnect'),
 };
 
+// === Classification endpoints (M8) ===
+export const classificationApi = {
+  list: () =>
+    api.get<{ data: import('@/src/types').SpendingClassification[] }>('/api/v1/classifications'),
+  detect: () =>
+    api.post<{ data: { classified: number } }>('/api/v1/classifications/detect'),
+  override: (id: string, classification_type: import('@/src/types').ClassificationType) =>
+    api.put(`/api/v1/classifications/${id}`, { classification_type }),
+};
+
 // === Settings endpoints ===
 export const settingsApi = {
   get: () => api.get<{ data: import('@/src/types').UserSettings }>('/api/v1/settings'),

@@ -16,6 +16,8 @@ import { CategoryCard } from '@/src/components/budget/CategoryCard';
 import { SummaryBar } from '@/src/components/budget/SummaryBar';
 import { colors, spacing } from '@/src/theme';
 import { useBudgetStore } from '@/src/stores/budgetStore';
+import { classificationApi } from '@/src/services/api';
+import { ClassificationType } from '@/src/types';
 
 export default function BudgetScreen() {
   const {
@@ -55,6 +57,27 @@ export default function BudgetScreen() {
   const handleDeleteItem = useCallback(async (itemId: string) => {
     await deleteLineItem(itemId);
   }, [deleteLineItem]);
+
+  // M8: Reclassify merchant — find classification by merchant name, override
+  const handleReclassify = useCallback(async (merchant: string, type: ClassificationType) => {
+    try {
+      const res = await classificationApi.list();
+      const existing = res.data.find((c) => c.merchant_normalized === merchant);
+      if (existing) {
+        await classificationApi.override(existing.id, type);
+      } else {
+        // No classification yet — run detection first, then override
+        await classificationApi.detect();
+        const res2 = await classificationApi.list();
+        const found = res2.data.find((c) => c.merchant_normalized === merchant);
+        if (found) await classificationApi.override(found.id, type);
+      }
+      // Refresh budget to show updated badges
+      fetchBudget();
+    } catch {
+      // Silent fail — classification is non-critical
+    }
+  }, [fetchBudget]);
 
   return (
     <AmbientBackground>
@@ -101,6 +124,7 @@ export default function BudgetScreen() {
                 onAddItem={handleAddItem}
                 onRenameItem={handleRenameItem}
                 onDeleteItem={handleDeleteItem}
+                onReclassify={handleReclassify}
               />
             ))}
         </View>
