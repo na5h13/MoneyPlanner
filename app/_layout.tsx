@@ -1,6 +1,6 @@
 // Root Layout — loads fonts, shows splash screen, renders slot
 import React, { useEffect } from 'react';
-import { Slot, useRouter, useSegments } from 'expo-router';
+import { Slot } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import {
   useFonts,
@@ -19,7 +19,7 @@ import {
 SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
-  const [fontsLoaded] = useFonts({
+  const [fontsLoaded, fontError] = useFonts({
     PlayfairDisplay_400Regular,
     PlayfairDisplay_600SemiBold,
     SourceSans3_400Regular,
@@ -29,12 +29,14 @@ export default function RootLayout() {
   });
 
   useEffect(() => {
-    if (fontsLoaded) {
+    // Hide splash when fonts are ready OR if they failed — never leave splash up forever
+    if (fontsLoaded || fontError) {
       SplashScreen.hideAsync();
     }
-  }, [fontsLoaded]);
+  }, [fontsLoaded, fontError]);
 
-  if (!fontsLoaded) {
+  // Keep splash visible while fonts are loading; proceed on error (fallback fonts)
+  if (!fontsLoaded && !fontError) {
     return null;
   }
 
