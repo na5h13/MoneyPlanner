@@ -96,11 +96,24 @@ router.put('/:id', async (req: Request, res: Response) => {
 // POST /api/v1/accounts/link
 router.post('/link', async (req: Request, res: Response) => {
   try {
+    console.log('POST /accounts/link — userId:', req.uid);
     const linkToken = await plaid.createLinkToken(req.uid);
     res.json({ link_token: linkToken });
-  } catch (err) {
-    console.error('POST /accounts/link error:', err);
-    res.status(500).json({ error: 'Failed to create link token' });
+  } catch (err: any) {
+    // Extract Plaid-specific error details if available
+    const plaidError = err?.response?.data;
+    const detail = plaidError?.error_message || err?.message || 'Unknown error';
+    const errorCode = plaidError?.error_code || '';
+    console.error('POST /accounts/link error:', {
+      detail,
+      errorCode,
+      plaidError,
+      stack: err?.stack,
+    });
+    res.status(500).json({
+      error: `Link token failed: ${detail}`,
+      error_code: errorCode,
+    });
   }
 });
 

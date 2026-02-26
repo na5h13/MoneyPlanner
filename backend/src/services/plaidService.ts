@@ -43,17 +43,36 @@ export interface PlaidTransactionData {
 }
 
 export async function createLinkToken(userId: string): Promise<string> {
-  const response = await client.linkTokenCreate({
+  const redirectUri = process.env.PLAID_REDIRECT_URI || undefined;
+  const webhookUrl = process.env.PLAID_WEBHOOK_URL || undefined;
+
+  const request: any = {
     products: [Products.Transactions],
     client_name: 'Keel',
     country_codes: [CountryCode.Ca, CountryCode.Us],
     language: 'en',
     user: { client_user_id: userId },
-    webhook: process.env.PLAID_WEBHOOK_URL,
-    // Required for OAuth institutions (TD, Wealthsimple, etc.)
-    // Must match an allowed redirect URI in Plaid Dashboard
-    redirect_uri: 'keel://plaid-oauth',
+    android_package_name: process.env.PLAID_ANDROID_PACKAGE_NAME || 'com.na5h13.keel',
+  };
+
+  // Only set redirect_uri if configured (must be registered in Plaid Dashboard)
+  if (redirectUri) {
+    request.redirect_uri = redirectUri;
+  }
+  if (webhookUrl) {
+    request.webhook = webhookUrl;
+  }
+
+  console.log('createLinkToken request:', {
+    userId,
+    env: PLAID_ENV,
+    hasClientId: !!PLAID_CLIENT_ID,
+    hasSecret: !!PLAID_SECRET,
+    redirectUri: redirectUri || '(not set)',
+    androidPackage: request.android_package_name,
   });
+
+  const response = await client.linkTokenCreate(request);
   return response.data.link_token;
 }
 

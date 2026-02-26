@@ -82,8 +82,9 @@ export default function SettingsScreen() {
       // 2. Clear any prior Plaid session
       await plaidDestroy();
 
-      // 3. Initialize Plaid Link (redirectUri required for OAuth banks: TD, Wealthsimple, etc.)
-      plaidCreate({ token: linkToken, redirectUri: 'keel://plaid-oauth' });
+      // 3. Initialize Plaid Link (noLoadingState prevents blank screen)
+      const plaidConfig: any = { token: linkToken, noLoadingState: true };
+      plaidCreate(plaidConfig);
 
       // 4. Open Plaid Link
       plaidOpen({
@@ -105,8 +106,9 @@ export default function SettingsScreen() {
           }
         },
       });
-    } catch {
-      Alert.alert('Error', 'Failed to initiate bank linking');
+    } catch (err: any) {
+      const msg = err?.message || err?.data?.error || 'Unknown error';
+      Alert.alert('Bank Link Error', `${msg}${err?.status ? ` (${err.status})` : ''}`);
     }
   }, [fetchAccounts, syncTransactions]);
 
