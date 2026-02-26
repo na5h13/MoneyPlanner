@@ -82,8 +82,8 @@ export default function SettingsScreen() {
       // 2. Clear any prior Plaid session
       await plaidDestroy();
 
-      // 3. Initialize Plaid Link
-      plaidCreate({ token: linkToken });
+      // 3. Initialize Plaid Link (redirectUri required for OAuth banks: TD, Wealthsimple, etc.)
+      plaidCreate({ token: linkToken, redirectUri: 'keel://plaid-oauth' });
 
       // 4. Open Plaid Link
       plaidOpen({

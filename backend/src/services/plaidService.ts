@@ -50,6 +50,9 @@ export async function createLinkToken(userId: string): Promise<string> {
     language: 'en',
     user: { client_user_id: userId },
     webhook: process.env.PLAID_WEBHOOK_URL,
+    // Required for OAuth institutions (TD, Wealthsimple, etc.)
+    // Must match an allowed redirect URI in Plaid Dashboard
+    redirect_uri: 'keel://plaid-oauth',
   });
   return response.data.link_token;
 }
