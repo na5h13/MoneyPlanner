@@ -22,10 +22,18 @@ async function getHeaders(): Promise<Record<string, string>> {
   }
 
   if (getAuthToken) {
-    const token = await getAuthToken();
-    if (token) {
-      headers['Authorization'] = `Bearer ${token}`;
+    try {
+      const token = await getAuthToken();
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      } else {
+        console.warn('Auth token provider returned null — request will be unauthenticated');
+      }
+    } catch (err) {
+      console.error('Auth token provider threw:', err);
     }
+  } else {
+    console.warn('No auth token provider set — request will be unauthenticated');
   }
 
   return headers;

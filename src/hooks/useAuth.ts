@@ -14,8 +14,10 @@ export function useAuth() {
       if (firebaseUser) {
         setAuthTokenProvider(async () => {
           try {
-            return await firebaseUser.getIdToken();
-          } catch {
+            const token = await firebaseUser.getIdToken(true);
+            return token;
+          } catch (err) {
+            console.error('Failed to get Firebase ID token:', err);
             return null;
           }
         });
