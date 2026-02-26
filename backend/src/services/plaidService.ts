@@ -43,34 +43,19 @@ export interface PlaidTransactionData {
 }
 
 export async function createLinkToken(userId: string): Promise<string> {
-  const redirectUri = process.env.PLAID_REDIRECT_URI || undefined;
-  const webhookUrl = process.env.PLAID_WEBHOOK_URL || undefined;
-
+  // Keep linkTokenCreate minimal — matches both working reference projects
+  // (budgeting-app and MoneyPlanner_old). Do NOT add redirect_uri,
+  // android_package_name, or webhook unless explicitly registered in
+  // the Plaid Dashboard — unregistered values cause API rejection.
   const request: any = {
     products: [Products.Transactions],
     client_name: 'Keel',
-    country_codes: [CountryCode.Ca, CountryCode.Us],
+    country_codes: [CountryCode.Ca],
     language: 'en',
     user: { client_user_id: userId },
-    android_package_name: process.env.PLAID_ANDROID_PACKAGE_NAME || 'com.na5h13.keel',
   };
 
-  // Only set redirect_uri if configured (must be registered in Plaid Dashboard)
-  if (redirectUri) {
-    request.redirect_uri = redirectUri;
-  }
-  if (webhookUrl) {
-    request.webhook = webhookUrl;
-  }
-
-  console.log('createLinkToken request:', {
-    userId,
-    env: PLAID_ENV,
-    hasClientId: !!PLAID_CLIENT_ID,
-    hasSecret: !!PLAID_SECRET,
-    redirectUri: redirectUri || '(not set)',
-    androidPackage: request.android_package_name,
-  });
+  console.log('createLinkToken:', { userId, env: PLAID_ENV, hasClientId: !!PLAID_CLIENT_ID, hasSecret: !!PLAID_SECRET });
 
   const response = await client.linkTokenCreate(request);
   return response.data.link_token;
