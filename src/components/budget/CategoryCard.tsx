@@ -1,7 +1,6 @@
-// Category Card — OpenSpec Section 21, Function 5
-// Scrollable category cards with line items, budget column with user-set targets,
-// tap-to-edit target, long-press rename, swipe-left delete, "+ Add item",
-// category collapse/expand, progress bar per category
+// Category Card — OpenSpec Section 21, Functions 5 + 6 (M5: Trending Column)
+// Collapsible category cards with line items, budget targets, progress bar,
+// trending projection (daily run-rate → month-end), status badge (ON_TRACK/WATCH/OVER)
 
 import React, { useState, useCallback } from 'react';
 import {
@@ -13,15 +12,12 @@ import {
 } from 'react-native';
 import { GlassCard } from '@/src/components/ui/Glass';
 import {
-  BodyText,
-  BodyBold,
   BodySmall,
-  SectionHeader,
+  BodyBold,
   DataText,
   Sublabel,
 } from '@/src/components/ui/Typography';
-import { AmountText } from '@/src/components/ui/AmountText';
-import { colors, spacing, fonts, glass } from '@/src/theme';
+import { colors, spacing, fonts } from '@/src/theme';
 import { BudgetCategoryDisplay, BudgetLineItem, TrendingStatus } from '@/src/types';
 import { formatAmount } from '@/src/utils/formatAmount';
 
@@ -35,18 +31,27 @@ interface CategoryCardProps {
   onDeleteItem: (itemId: string) => void;
 }
 
-// Status → color mapping (NNR-01: NO RED)
+// Status → color mapping (NNR-COLOR: NO RED ever)
 function statusColor(status: TrendingStatus): string {
   switch (status) {
     case 'ON_TRACK': return colors.brand.deepSage;
-    case 'WATCH': return colors.data.warning;
-    case 'OVER': return colors.data.warning;
-    default: return colors.data.neutral;
+    case 'WATCH':    return colors.data.warning;
+    case 'OVER':     return colors.data.warning;
+    default:         return colors.data.neutral;
   }
 }
 
 function statusGlow(status: TrendingStatus): 'warning' | undefined {
   return status === 'OVER' ? 'warning' : undefined;
+}
+
+function statusLabel(status: TrendingStatus): string | null {
+  switch (status) {
+    case 'ON_TRACK': return 'ON TRACK';
+    case 'WATCH':    return 'WATCH';
+    case 'OVER':     return 'OVER';
+    default:         return null;
+  }
 }
 
 export function CategoryCard({
@@ -61,18 +66,17 @@ export function CategoryCard({
   const { category, target, line_items, spent, trending } = data;
   const targetAmount = target?.target_amount || 0;
   const trendingStatus = trending?.status || 'NO_TARGET';
+  const projected = trending?.projected || 0;
 
   const [editingTarget, setEditingTarget] = useState(false);
   const [targetInput, setTargetInput] = useState('');
   const [addingItem, setAddingItem] = useState(false);
   const [newItemName, setNewItemName] = useState('');
 
-  // Tap header → toggle collapse
   const handleHeaderPress = useCallback(() => {
     onToggleCollapse();
   }, [onToggleCollapse]);
 
-  // Tap budget target → edit
   const handleTargetPress = useCallback(() => {
     setTargetInput(targetAmount ? String(targetAmount / 100) : '');
     setEditingTarget(true);
@@ -81,12 +85,11 @@ export function CategoryCard({
   const handleTargetSubmit = useCallback(() => {
     const parsed = parseFloat(targetInput);
     if (!isNaN(parsed) && parsed >= 0) {
-      onEditTarget(category.id, Math.round(parsed * 100)); // Convert to cents
+      onEditTarget(category.id, Math.round(parsed * 100));
     }
     setEditingTarget(false);
   }, [targetInput, category.id, onEditTarget]);
 
-  // Long-press line item → rename
   const handleLongPressItem = useCallback((item: BudgetLineItem) => {
     Alert.prompt?.(
       'Rename Item',
@@ -98,13 +101,11 @@ export function CategoryCard({
       'plain-text',
       item.display_name
     );
-    // Fallback for Android (no Alert.prompt)
     if (!Alert.prompt) {
       onRenameItem(item.id, item.display_name);
     }
   }, [onRenameItem]);
 
-  // Swipe-left to delete (simplified as tap delete for now)
   const handleDeleteItem = useCallback((item: BudgetLineItem) => {
     Alert.alert(
       'Delete Item',
@@ -116,7 +117,6 @@ export function CategoryCard({
     );
   }, [onDeleteItem]);
 
-  // Add item
   const handleAddItem = useCallback(() => {
     if (newItemName.trim()) {
       onAddItem(category.id, newItemName.trim());
@@ -126,8 +126,18 @@ export function CategoryCard({
   }, [newItemName, category.id, onAddItem]);
 
   // Progress bar calculations
-  const progressPercent = targetAmount > 0 ? Math.min(spent / targetAmount, 1.5) : 0;
-  const markerPercent = targetAmount > 0 ? 1 : 0; // Budget marker at 100%
+  const spentPct = targetAmount > 0 ? Math.min((spent / targetAmount) * 100, 100) : 0;
+  const projectedPct = targetAmount > 0 ? Math.min((projected / targetAmount) * 100, 145) : 0;
+
+  // Show trending projection when we have enough data
+  const showTrending = (
+    trendingStatus === 'ON_TRACK' ||
+    trendingStatus === 'WATCH' ||
+    trendingStatus === 'OVER'
+  ) && projected > 0;
+
+  const badge = statusLabel(trendingStatus);
+  const sColor = statusColor(trendingStatus);
 
   return (
     <GlassCard
@@ -144,38 +154,74 @@ export function CategoryCard({
               {isCollapsed ? '▸' : '▾'}
             </BodySmall>
           </View>
+
+          {/* Right: SPENT → PROJECTED + STATUS BADGE */}
           <View style={styles.headerRight}>
-            {/* Spent subtotal */}
-            <AmountText cents={spent} fontSize={13} />
-            {/* Budget target */}
-            {targetAmount > 0 && (
-              <Sublabel style={styles.targetLabel}>
-                of {formatAmount(-targetAmount)}
-              </Sublabel>
+            <View style={styles.headerMetrics}>
+              <View style={styles.headerMetric}>
+                <Sublabel style={styles.metricLabel}>SPENT</Sublabel>
+                <DataText style={styles.metricAmount}>
+                  {formatAmount(-spent)}
+                </DataText>
+              </View>
+
+              {showTrending && (
+                <>
+                  <Sublabel style={styles.metricArrow}>→</Sublabel>
+                  <View style={styles.headerMetric}>
+                    <Sublabel style={[styles.metricLabel, { color: sColor }]}>PROJ</Sublabel>
+                    <DataText style={[styles.metricAmount, { color: sColor }]}>
+                      {formatAmount(-projected)}
+                    </DataText>
+                  </View>
+                </>
+              )}
+
+              {!showTrending && targetAmount > 0 && (
+                <Sublabel style={styles.ofTarget}>
+                  of {formatAmount(-targetAmount)}
+                </Sublabel>
+              )}
+            </View>
+
+            {badge && (
+              <View style={[styles.statusBadge, { borderColor: sColor + '55' }]}>
+                <Sublabel style={[styles.statusText, { color: sColor }]}>
+                  {badge}
+                </Sublabel>
+              </View>
             )}
           </View>
         </TouchableOpacity>
 
-        {/* Progress bar — 4px height, 2px radius */}
+        {/* Progress bar: projected (faded) behind spent (solid) */}
         {targetAmount > 0 && (
           <View style={styles.progressContainer}>
             <View style={styles.progressBg}>
+              {/* Projected fill — faded, behind spent */}
+              {showTrending && projectedPct > spentPct && (
+                <View
+                  style={[
+                    styles.progressFill,
+                    {
+                      width: `${projectedPct}%`,
+                      backgroundColor: sColor + '28',
+                    },
+                  ]}
+                />
+              )}
+              {/* Spent fill — solid, on top */}
               <View
                 style={[
                   styles.progressFill,
                   {
-                    width: `${Math.min(progressPercent * 100, 100)}%`,
-                    backgroundColor: statusColor(trendingStatus),
+                    width: `${spentPct}%`,
+                    backgroundColor: sColor,
                   },
                 ]}
               />
-              {/* Budget marker — 2px vertical line at target position */}
-              <View
-                style={[
-                  styles.budgetMarker,
-                  { left: `${Math.min(markerPercent * 100, 100)}%` },
-                ]}
-              />
+              {/* Budget marker at 100% */}
+              <View style={styles.budgetMarker} />
             </View>
           </View>
         )}
@@ -187,7 +233,6 @@ export function CategoryCard({
             <View style={styles.columnHeaders}>
               <Sublabel style={styles.colHeaderLeft}>ITEM</Sublabel>
               <Sublabel style={styles.colHeaderRight}>BUDGET</Sublabel>
-              <Sublabel style={styles.colHeaderRight}>SPENT</Sublabel>
             </View>
 
             {/* Line items */}
@@ -206,7 +251,6 @@ export function CategoryCard({
                 <DataText style={styles.lineItemAmount}>
                   {item.budget_amount ? formatAmount(-item.budget_amount) : '—'}
                 </DataText>
-                {/* Delete button (swipe-left substitute) */}
                 <TouchableOpacity
                   onPress={() => handleDeleteItem(item)}
                   style={styles.lineDeleteBtn}
@@ -278,16 +322,19 @@ const styles = StyleSheet.create({
   cardInner: {
     padding: spacing.lg,
   },
+
+  // Header
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
+    alignItems: 'flex-start',
   },
   headerLeft: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
     flex: 1,
+    paddingTop: 2,
   },
   categoryName: {
     fontSize: 14,
@@ -297,12 +344,54 @@ const styles = StyleSheet.create({
     fontSize: 10,
     color: colors.data.neutral,
   },
+
+  // Right side: metrics + status badge
   headerRight: {
     alignItems: 'flex-end',
+    gap: 4,
   },
-  targetLabel: {
+  headerMetrics: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  headerMetric: {
+    alignItems: 'flex-end',
+  },
+  metricLabel: {
+    fontSize: 7,
+    textTransform: 'uppercase',
+    letterSpacing: 0.4,
+    color: colors.data.neutral,
+    marginBottom: 1,
+  },
+  metricAmount: {
+    fontSize: 12,
+    color: colors.brand.deepSage,
+  },
+  metricArrow: {
     fontSize: 9,
-    marginTop: 1,
+    color: colors.data.neutral,
+    marginTop: 10,
+  },
+  ofTarget: {
+    fontSize: 9,
+    color: colors.data.neutral,
+    marginTop: 10,
+  },
+
+  // Status badge
+  statusBadge: {
+    borderWidth: 1,
+    borderRadius: 4,
+    paddingHorizontal: 5,
+    paddingVertical: 2,
+  },
+  statusText: {
+    fontSize: 7,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    fontWeight: '600',
   },
 
   // Progress bar
@@ -327,11 +416,12 @@ const styles = StyleSheet.create({
   budgetMarker: {
     position: 'absolute',
     top: -2,
+    left: '100%',
+    marginLeft: -1,
     width: 2,
     height: 8,
     backgroundColor: colors.brand.deepSage,
     borderRadius: 1,
-    marginLeft: -1,
   },
 
   // Expanded content
