@@ -127,18 +127,10 @@ jobs:
           print("Pinned kotlin-gradle-plugin:1.9.25 in android/build.gradle")
           PYEOF
 
-      - name: Generate keystore
+      - name: Restore keystore
         run: |
-          keytool -genkeypair \
-            -keystore android/app/release.keystore \
-            -alias keel \
-            -keyalg RSA \
-            -keysize 2048 \
-            -validity 10000 \
-            -storepass keel_release_2024 \
-            -keypass keel_release_2024 \
-            -dname "CN=Keel,OU=Mobile,O=na5h13,L=Toronto,S=ON,C=CA" \
-            -noprompt
+          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > android/app/release.keystore
+          echo "Keystore restored from secret (SHA-1 is fixed — registered in Firebase)"
 
       - name: Configure signing in gradle.properties
         run: |
