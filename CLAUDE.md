@@ -176,8 +176,14 @@ Plaid API → Express Backend (sync, encrypt, categorize) → Firestore → Reac
 | **M2** | Categorization (CategoryPicker) | **COMPLETE** |
 | **M3** | Settings Screen | **COMPLETE** |
 | **M4** | Budget Screen | **COMPLETE** |
-| **M5** | Trending Column | PENDING |
-| **M6-M12** | Remaining milestones | PENDING |
+| **M5** | Trending Column | **COMPLETE** |
+| **M6** | Summary Bar Enhancement | **COMPLETE** |
+| **M7** | Background Sync + Webhook | **COMPLETE** |
+| **M8** | Trending Classification Engine | **COMPLETE** |
+| **M9** | Edge Cases + Error Handling | PENDING |
+| **M10** | Auth + Onboarding | PENDING |
+| **M11** | Behavioral Engine | PENDING |
+| **M12** | IIN Module | PENDING |
 
 ## What NOT to Do
 
