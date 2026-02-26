@@ -167,6 +167,11 @@ export const accountApi = {
     api.put<{ data: import('@/src/types').Account }>(`/api/v1/accounts/${id}`, data),
   createLinkToken: () =>
     api.post<{ link_token: string }>('/api/v1/accounts/link'),
+  exchangeToken: (public_token: string, metadata: any) =>
+    api.post<{ data: { item_id: string; success: boolean } }>('/api/v1/accounts/exchange', {
+      public_token,
+      metadata,
+    }),
   disconnect: () => api.delete('/api/v1/accounts/disconnect'),
 };
 

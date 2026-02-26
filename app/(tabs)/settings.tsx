@@ -15,6 +15,7 @@ import {
 } from 'react-native';
 import auth from '@react-native-firebase/auth';
 import { GoogleSignin } from '@react-native-google-signin/google-signin';
+import { create as plaidCreate, open as plaidOpen, destroy as plaidDestroy } from 'react-native-plaid-link-sdk';
 import { AmbientBackground, GlassCard } from '@/src/components/ui/Glass';
 import {
   ScreenName,
@@ -74,14 +75,40 @@ export default function SettingsScreen() {
   // === Account Actions ===
   const handleAddAccount = useCallback(async () => {
     try {
+      // 1. Get a link token from backend
       const res = await accountApi.createLinkToken();
-      // Plaid Link would open here with the link_token
-      // For now, show the token was created
-      Alert.alert('Plaid Link', 'Link token created. Plaid Link integration pending.');
-    } catch (err) {
-      Alert.alert('Error', 'Failed to create link token');
+      const linkToken = res.link_token;
+
+      // 2. Clear any prior Plaid session
+      await plaidDestroy();
+
+      // 3. Initialize Plaid Link
+      plaidCreate({ token: linkToken });
+
+      // 4. Open Plaid Link
+      plaidOpen({
+        onSuccess: async (success) => {
+          try {
+            // Exchange public token for access token
+            await accountApi.exchangeToken(success.publicToken, success.metadata);
+            // Sync transactions for the new account
+            await fetchAccounts();
+            syncTransactions();
+            Alert.alert('Account Linked', 'Your bank account has been connected successfully.');
+          } catch {
+            Alert.alert('Error', 'Failed to complete account linking');
+          }
+        },
+        onExit: (exit) => {
+          if (exit?.error?.errorMessage) {
+            Alert.alert('Link Error', exit.error.errorMessage);
+          }
+        },
+      });
+    } catch {
+      Alert.alert('Error', 'Failed to initiate bank linking');
     }
-  }, []);
+  }, [fetchAccounts, syncTransactions]);
 
   const handleToggleAccount = useCallback(async (id: string) => {
     await toggleAccountHidden(id);
