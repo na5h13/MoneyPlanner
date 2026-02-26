@@ -16,7 +16,7 @@ jobs:
 
       - name: Install Railway CLI
         run: |
-          curl -fsSL https://railway.app/install.sh | sh
+          npm install -g @railway/cli@latest || curl -fsSL https://railway.app/install.sh | sh
           railway --version
 
       - name: Deploy to Railway
