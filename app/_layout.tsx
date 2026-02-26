@@ -1,7 +1,8 @@
-// Root Layout — loads fonts, shows splash screen, sync-on-open, renders slot
+// Root Layout — font loading, auth routing, sync-on-open
 import React, { useEffect } from 'react';
-import { Slot } from 'expo-router';
+import { Slot, useRouter, useSegments } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
+import { useAuth } from '@/src/hooks/useAuth';
 import { useSyncOnOpen } from '@/src/hooks/useSyncOnOpen';
 import {
   useFonts,
@@ -19,9 +20,30 @@ import {
 
 SplashScreen.preventAutoHideAsync();
 
-export default function RootLayout() {
+function AuthRouter() {
+  const { user, isLoading } = useAuth();
+  const segments = useSegments();
+  const router = useRouter();
+
+  // Sync on foreground — only when authenticated
   useSyncOnOpen();
 
+  useEffect(() => {
+    if (isLoading) return;
+
+    const inAuthGroup = segments[0] === 'auth';
+
+    if (!user && !inAuthGroup) {
+      router.replace('/auth/login');
+    } else if (user && inAuthGroup) {
+      router.replace('/(tabs)/budget');
+    }
+  }, [user, isLoading, segments]);
+
+  return <Slot />;
+}
+
+export default function RootLayout() {
   const [fontsLoaded, fontError] = useFonts({
     PlayfairDisplay_400Regular,
     PlayfairDisplay_600SemiBold,
@@ -32,16 +54,14 @@ export default function RootLayout() {
   });
 
   useEffect(() => {
-    // Hide splash when fonts are ready OR if they failed — never leave splash up forever
     if (fontsLoaded || fontError) {
       SplashScreen.hideAsync();
     }
   }, [fontsLoaded, fontError]);
 
-  // Keep splash visible while fonts are loading; proceed on error (fallback fonts)
   if (!fontsLoaded && !fontError) {
     return null;
   }
 
-  return <Slot />;
+  return <AuthRouter />;
 }

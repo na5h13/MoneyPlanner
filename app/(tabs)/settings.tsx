@@ -13,6 +13,8 @@ import {
   ActivityIndicator,
   Switch,
 } from 'react-native';
+import auth from '@react-native-firebase/auth';
+import { GoogleSignin } from '@react-native-google-signin/google-signin';
 import { AmbientBackground, GlassCard } from '@/src/components/ui/Glass';
 import {
   ScreenName,
@@ -84,6 +86,25 @@ export default function SettingsScreen() {
   const handleToggleAccount = useCallback(async (id: string) => {
     await toggleAccountHidden(id);
   }, [toggleAccountHidden]);
+
+  const handleSignOut = useCallback(() => {
+    Alert.alert('Sign Out', 'Are you sure you want to sign out?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Sign Out',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await GoogleSignin.signOut();
+            await auth().signOut();
+            // _layout.tsx auth router redirects to /auth/login
+          } catch {
+            Alert.alert('Error', 'Failed to sign out');
+          }
+        },
+      },
+    ]);
+  }, []);
 
   const handleDisconnect = useCallback(() => {
     Alert.alert(
@@ -398,12 +419,21 @@ export default function SettingsScreen() {
               {accounts.length > 0 && (
                 <TouchableOpacity
                   onPress={handleDisconnect}
-                  style={styles.prefRow}
+                  style={[styles.prefRow, styles.prefRowBorder]}
                   activeOpacity={0.6}
                 >
                   <BodyText style={styles.dangerText}>Disconnect Bank</BodyText>
                 </TouchableOpacity>
               )}
+
+              {/* Sign Out */}
+              <TouchableOpacity
+                onPress={handleSignOut}
+                style={styles.prefRow}
+                activeOpacity={0.6}
+              >
+                <BodyText style={styles.dangerText}>Sign Out</BodyText>
+              </TouchableOpacity>
             </View>
           </GlassCard>
         </View>
