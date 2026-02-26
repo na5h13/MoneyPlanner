@@ -1,4 +1,4 @@
-// Summary Bar placeholder — OpenSpec Section 21, Function 7
+// Summary Bar — OpenSpec Section 21, Function 7 (M6)
 // Hero: SAFE TO SPEND = Income - Committed
 // Breakdown: INCOME | COMMITTED | ONE-TIME
 // Glass-strong with glow border
@@ -7,16 +7,17 @@ import React from 'react';
 import { View, StyleSheet } from 'react-native';
 import { GlassCard } from '@/src/components/ui/Glass';
 import { HeroText, SectionHeader, Sublabel, DataText } from '@/src/components/ui/Typography';
-import { colors, spacing, fonts } from '@/src/theme';
+import { colors, spacing } from '@/src/theme';
 import { formatAmount, amountColor } from '@/src/utils/formatAmount';
 
 interface SummaryBarProps {
   income: number;       // cents
   committed: number;    // cents
+  oneTime: number;      // cents — non-recurring > $200 threshold
   safeToSpend: number;  // cents
 }
 
-export function SummaryBar({ income, committed, safeToSpend }: SummaryBarProps) {
+export function SummaryBar({ income, committed, oneTime, safeToSpend }: SummaryBarProps) {
   return (
     <GlassCard
       tier="strong"
@@ -36,13 +37,27 @@ export function SummaryBar({ income, committed, safeToSpend }: SummaryBarProps) 
               {formatAmount(-income)}
             </DataText>
           </View>
+
           <View style={styles.divider} />
+
           <View style={styles.breakdownItem}>
             <Sublabel style={styles.breakdownLabel}>COMMITTED</Sublabel>
             <DataText style={[styles.breakdownValue, { color: colors.brand.deepSage }]}>
               {formatAmount(committed)}
             </DataText>
           </View>
+
+          {oneTime > 0 && (
+            <>
+              <View style={styles.divider} />
+              <View style={styles.breakdownItem}>
+                <Sublabel style={styles.breakdownLabel}>ONE-TIME</Sublabel>
+                <DataText style={[styles.breakdownValue, { color: colors.data.warning }]}>
+                  {formatAmount(oneTime)}
+                </DataText>
+              </View>
+            </>
+          )}
         </View>
       </View>
     </GlassCard>

@@ -63,11 +63,24 @@ router.get('/', async (req: Request, res: Response) => {
     const transactions = txnSnap.docs.map(d => d.data());
 
     // Compute spending per category (cents)
+    const ONE_TIME_THRESHOLD = 20000; // $200 in cents
     const spentByCategory = new Map<string, number>();
+    let totalIncome = 0;
+    let totalCommitted = 0;
+    let totalOneTime = 0;
+
     for (const txn of transactions) {
-      if (txn.is_income) continue; // Don't count income in budget spending
+      const amt = Math.abs(txn.amount);
+      if (txn.is_income) {
+        totalIncome += amt;
+        continue;
+      }
       const catId = txn.category_id || 'uncategorized';
-      spentByCategory.set(catId, (spentByCategory.get(catId) || 0) + Math.abs(txn.amount));
+      spentByCategory.set(catId, (spentByCategory.get(catId) || 0) + amt);
+      totalCommitted += amt;
+      if (!txn.is_recurring && amt > ONE_TIME_THRESHOLD) {
+        totalOneTime += amt;
+      }
     }
 
     // Compute trending per category
@@ -121,7 +134,14 @@ router.get('/', async (req: Request, res: Response) => {
       };
     });
 
-    res.json({ data: budgetDisplay });
+    const summary = {
+      income: totalIncome,
+      committed: totalCommitted,
+      one_time: totalOneTime,
+      safe_to_spend: totalIncome - totalCommitted,
+    };
+
+    res.json({ data: budgetDisplay, summary });
   } catch (err) {
     console.error('GET /budget error:', err);
     res.status(500).json({ error: 'Failed to fetch budget' });

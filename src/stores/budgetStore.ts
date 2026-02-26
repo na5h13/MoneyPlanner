@@ -9,6 +9,7 @@ import {
   BudgetTarget,
   BudgetLineItem,
   BudgetCategoryDisplay,
+  BudgetSummary,
   Account,
   TransactionFilter,
   SyncStatus,
@@ -36,6 +37,7 @@ interface BudgetState {
 
   // Budget
   budgetDisplay: BudgetCategoryDisplay[];
+  budgetSummary: BudgetSummary | null;
   budgetLoading: boolean;
   budgetPeriod: string; // YYYY-MM
   collapsedCategories: Set<string>;
@@ -91,6 +93,7 @@ export const useBudgetStore = create<BudgetState>((set, get) => ({
   categoriesLoading: false,
 
   budgetDisplay: [],
+  budgetSummary: null,
   budgetLoading: false,
   budgetPeriod: currentMonth(),
   collapsedCategories: new Set(),
@@ -167,7 +170,7 @@ export const useBudgetStore = create<BudgetState>((set, get) => ({
     set({ budgetLoading: true });
     try {
       const res = await budgetApi.get(p);
-      set({ budgetDisplay: res.data, budgetLoading: false });
+      set({ budgetDisplay: res.data, budgetSummary: res.summary ?? null, budgetLoading: false });
     } catch {
       set({ budgetLoading: false });
     }

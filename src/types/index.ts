@@ -162,6 +162,14 @@ export interface PaginatedResponse<T> {
   per_page: number;
 }
 
+// Budget summary (M6 — Summary Bar)
+export interface BudgetSummary {
+  income: number;       // cents — total income this period
+  committed: number;    // cents — total non-income spending
+  one_time: number;     // cents — non-recurring expenses > $200 threshold
+  safe_to_spend: number; // cents — income - committed
+}
+
 // Budget period for navigation
 export interface BudgetPeriod {
   year: number;

@@ -139,9 +139,10 @@ export const categoryApi = {
 export const budgetApi = {
   get: (period?: string) => {
     const qs = period ? `?period=${period}` : '';
-    return api.get<{ data: import('@/src/types').BudgetCategoryDisplay[] }>(
-      `/api/v1/budget${qs}`
-    );
+    return api.get<{
+      data: import('@/src/types').BudgetCategoryDisplay[];
+      summary: import('@/src/types').BudgetSummary;
+    }>(`/api/v1/budget${qs}`);
   },
   setTarget: (data: { category_id: string; target_amount: number; period_start: string }) =>
     api.post<{ data: import('@/src/types').BudgetTarget }>('/api/v1/budget/targets', data),

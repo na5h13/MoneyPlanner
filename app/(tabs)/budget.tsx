@@ -1,10 +1,8 @@
-// Budget Screen — OpenSpec Section 21, Function 5
-// Scrollable category cards with line items, budget column with user-set targets,
-// tap-to-edit target, long-press rename, swipe-left delete, "+ Add item",
-// initial budget suggestion (3-month average, rounded to $25),
-// category collapse/expand, period navigation, Summary bar placeholder
+// Budget Screen — OpenSpec Section 21, Functions 5 + 7 (M6: Summary Bar Enhancement)
+// Scrollable category cards with line items, budget targets, trending projection,
+// Summary Bar with safe-to-spend hero + income/committed/one-time breakdown
 
-import React, { useEffect, useCallback, useMemo } from 'react';
+import React, { useEffect, useCallback } from 'react';
 import {
   View,
   ScrollView,
@@ -22,6 +20,7 @@ import { useBudgetStore } from '@/src/stores/budgetStore';
 export default function BudgetScreen() {
   const {
     budgetDisplay,
+    budgetSummary,
     budgetLoading,
     budgetPeriod,
     collapsedCategories,
@@ -40,26 +39,6 @@ export default function BudgetScreen() {
     fetchBudget();
     fetchCategories();
   }, []);
-
-  // Compute summary bar values
-  const summaryValues = useMemo(() => {
-    let income = 0;
-    let committed = 0;
-
-    for (const cat of budgetDisplay) {
-      if (cat.category?.is_income) {
-        income += cat.spent;
-      } else {
-        committed += cat.spent;
-      }
-    }
-
-    return {
-      income,
-      committed,
-      safeToSpend: income - committed,
-    };
-  }, [budgetDisplay]);
 
   const handleEditTarget = useCallback(async (categoryId: string, amount: number) => {
     await updateBudgetTarget(categoryId, amount);
@@ -94,9 +73,10 @@ export default function BudgetScreen() {
         {/* Summary Bar (Safe to Spend hero) */}
         <View style={styles.content}>
           <SummaryBar
-            income={summaryValues.income}
-            committed={summaryValues.committed}
-            safeToSpend={summaryValues.safeToSpend}
+            income={budgetSummary?.income ?? 0}
+            committed={budgetSummary?.committed ?? 0}
+            oneTime={budgetSummary?.one_time ?? 0}
+            safeToSpend={budgetSummary?.safe_to_spend ?? 0}
           />
 
           {/* Loading */}
