@@ -1,8 +1,11 @@
 [phases.setup]
-nixPkgs = ["python312", "gcc"]
+nixPkgs = ["nodejs_20"]
 
 [phases.install]
-cmds = ["cd backend && pip install -r requirements.txt"]
+cmds = ["npm install --production=false"]
+
+[phases.build]
+cmds = ["npm run build"]
 
 [start]
-cmd = "cd backend && gunicorn 'app:create_app()' --bind 0.0.0.0:$PORT --workers 2"
+cmd = "node dist/index.js"
