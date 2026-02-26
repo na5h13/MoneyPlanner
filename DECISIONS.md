@@ -153,6 +153,33 @@
 - (-) Patch script is fragile — depends on Expo's build.gradle format
 - (-) Ephemeral keystore means APKs aren't reproducibly signed
 
+### ADR-010: Minimal Plaid linkTokenCreate (No OAuth Params by Default)
+
+**Date:** 2026-02-26
+**Status:** Accepted
+**Context:** Adding `redirect_uri` to linkTokenCreate caused ALL bank linking to fail because the URI wasn't registered in Plaid Dashboard. TD/Wealthsimple (OAuth banks) need these params, but CIBC (non-OAuth) doesn't.
+**Decision:** linkTokenCreate sends only minimal params by default (products, client_name, country_codes, language, user). OAuth params (redirect_uri, android_package_name) are conditionally added via PLAID_REDIRECT_URI and PLAID_ANDROID_PACKAGE_NAME env vars — only when registered in Plaid Dashboard.
+**Alternatives Considered:**
+- Always include OAuth params — breaks all banks if not Dashboard-registered
+- Separate link token endpoints for OAuth vs non-OAuth — over-engineering
+- Use Plaid institutions API to detect OAuth banks — adds complexity, still needs Dashboard registration
+**Consequences:**
+- (+) Non-OAuth banks (CIBC) always work
+- (+) OAuth banks work when user registers values in Plaid Dashboard
+- (-) TD/Wealthsimple won't work until Dashboard is configured (user action required)
+
+### ADR-011: Evidence-Based Behavioral Architecture (from budgeting-app)
+
+**Date:** 2026-02-26
+**Status:** Accepted (informing future milestones M11+)
+**Context:** Research from budgeting-app project demonstrates that traditional budgeting apps increase engagement but NOT spending reduction. The reference project implemented a 4-layer behavioral stack grounded in Tier 1 RCTs.
+**Decision:** Future behavioral engine (M11+) should follow the 4-layer architecture: Automation → Goals → Monitoring → Accountability, with phase-gated feature unlocking.
+**Consequences:**
+- (+) Every feature maps to documented evidence tier
+- (+) Automation as behavioral floor works even if user disengages
+- (-) Complex state machine to implement
+- (-) Users may be frustrated by locked features early on
+
 ---
 
 ## Rejected Approaches

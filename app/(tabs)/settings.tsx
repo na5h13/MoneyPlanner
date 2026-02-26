@@ -90,17 +90,24 @@ export default function SettingsScreen() {
       plaidOpen({
         onSuccess: async (success) => {
           try {
+            console.log('Plaid onSuccess — exchanging token...');
+            console.log('  publicToken:', success.publicToken?.substring(0, 15) + '...');
+            console.log('  institution:', JSON.stringify(success.metadata?.institution));
             // Exchange public token for access token
             await accountApi.exchangeToken(success.publicToken, success.metadata);
+            console.log('Exchange successful — fetching accounts...');
             // Sync transactions for the new account
             await fetchAccounts();
             syncTransactions();
             Alert.alert('Account Linked', 'Your bank account has been connected successfully.');
-          } catch {
-            Alert.alert('Error', 'Failed to complete account linking');
+          } catch (exchangeErr: any) {
+            const detail = exchangeErr?.data?.error || exchangeErr?.message || 'Unknown error';
+            console.error('Exchange failed:', detail, exchangeErr);
+            Alert.alert('Exchange Error', detail);
           }
         },
         onExit: (exit) => {
+          console.log('Plaid onExit:', JSON.stringify(exit));
           if (exit?.error?.errorMessage) {
             Alert.alert('Link Error', exit.error.errorMessage);
           }

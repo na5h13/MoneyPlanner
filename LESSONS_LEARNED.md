@@ -102,6 +102,54 @@
 **Solution:** Use individual `echo` statements instead of heredoc for .env values.
 **Rule:** In GitHub Actions YAML, don't use heredocs for config files — indentation leaks into content. Use individual echo/printf statements.
 
+### 2026-02-26 — Railway Deployed Python Start Command for Node Backend
+
+**Context:** Backend was rewritten from Flask/Python to Express/TypeScript.
+**Problem:** All API requests returned 404. Railway logs showed backend failing to start.
+**Root Cause:** `railway.json` still had `gunicorn` start command from the old Python backend.
+**Solution:** Changed railway.json start command to `cd backend && npm run start`.
+**Rule:** When migrating backend languages, update ALL deployment configs (railway.json, Dockerfile, Procfile). Check the start command FIRST when debugging 404s.
+
+### 2026-02-26 — Unregistered Plaid redirect_uri Kills ALL Bank Linking
+
+**Context:** Adding OAuth support for TD and Wealthsimple banks.
+**Problem:** Adding `redirect_uri: 'keel://plaid-oauth'` to linkTokenCreate caused ALL banks (including non-OAuth CIBC) to fail with INVALID_INPUT.
+**Root Cause:** Any `redirect_uri` passed to Plaid must be pre-registered in the Plaid Dashboard. Unregistered URIs cause immediate API rejection — even for non-OAuth banks.
+**Solution:** Stripped linkTokenCreate to minimal params (products, client_name, country_codes, language, user). Made redirect_uri and android_package_name conditionally added via env vars, only when registered in Plaid Dashboard.
+**Rule:** NEVER hardcode Plaid redirect_uri or android_package_name. Use env vars so they're only sent when registered in Dashboard. Both reference projects use minimal linkTokenCreate with no OAuth params.
+
+### 2026-02-26 — Plaid SDK metadata.institution.id vs institution_id
+
+**Context:** Storing institution info from Plaid Link's onSuccess metadata.
+**Problem:** Backend stored empty institution_id because it looked for `metadata.institution.institution_id`.
+**Root Cause:** react-native-plaid-link-sdk returns `institution.id`, not `institution.institution_id`.
+**Solution:** Check both: `metadata?.institution?.id || metadata?.institution?.institution_id || ''`.
+**Rule:** Check the ACTUAL SDK object shape, not assumed naming. Plaid's web vs mobile SDKs may differ.
+
+### 2026-02-26 — Duplicate .env Entries Use Last Value Only
+
+**Context:** .env file had two `EXPO_PUBLIC_API_BASE_URL` entries (localhost and Railway URL).
+**Problem:** App connected to the wrong backend depending on which value was used.
+**Root Cause:** Copy-paste during development left duplicate entries. Expo's env loading picks the first or last depending on the loader.
+**Solution:** Deduplicate .env entries. Use a single source of truth.
+**Rule:** Before debugging API connection issues, check .env for duplicate keys. Use `grep` to find duplicates.
+
+### 2026-02-26 — OAuth Banks (TD, Wealthsimple) Need Plaid Dashboard Registration
+
+**Context:** TD and Wealthsimple fail immediately when selected in Plaid Link.
+**Problem:** These OAuth banks redirect users to the bank's website, then back to the app. Without registered redirect_uri + android_package_name, the redirect fails.
+**Root Cause:** OAuth institutions require: (1) redirect_uri registered in Plaid Dashboard, (2) android_package_name registered in Dashboard, (3) both values passed in linkTokenCreate.
+**Solution:** Code supports conditional OAuth via PLAID_REDIRECT_URI and PLAID_ANDROID_PACKAGE_NAME env vars. User must register values in Plaid Dashboard before setting env vars.
+**Rule:** OAuth banks are a Dashboard configuration issue, not just a code issue. Non-OAuth banks (CIBC) work without any OAuth config.
+
+### 2026-02-26 — aarch64 Machines Cannot Build Android APKs Locally
+
+**Context:** Attempting `./gradlew assembleDebug` on Ubuntu aarch64.
+**Problem:** AAPT2 daemon failed: "Exec format error" — the binary is x86-64.
+**Root Cause:** Android SDK tools (AAPT2) only ship x86-64 binaries. aarch64 hosts cannot execute them.
+**Solution:** Use GitHub Actions CI for all Android builds. Never attempt local builds on aarch64.
+**Rule:** If `uname -m` returns aarch64, don't try local Android builds. Use CI exclusively.
+
 ---
 
 ## Quick Reference — Common Gotchas
@@ -120,6 +168,15 @@
 | tsconfig picks up worktrees | Add worktree dirs to `exclude` |
 | Backend is in `backend/` not root | All backend commands need `cd backend/` or absolute paths |
 | All amounts are cents (integer) | Use `formatAmount(cents)` for display, never divide by 100 inline |
+| Plaid linkTokenCreate must be minimal | Only: products, client_name, country_codes, language, user. OAuth params via env vars only |
+| OAuth banks need Dashboard registration | redirect_uri + android_package_name must be registered in Plaid Dashboard first |
+| Unregistered Plaid params kill ALL banks | Don't add redirect_uri/android_package_name unless registered — INVALID_INPUT error |
+| railway.json must match current stack | Always verify start command matches backend language after migration |
+| aarch64 cannot build APKs locally | Use GitHub Actions CI exclusively for Android builds |
+| Duplicate .env keys cause confusion | Check for duplicates before debugging API connection issues |
+| Plaid SDK: institution.id not institution_id | Mobile SDK uses `.id`, some web examples use `.institution_id` |
+| Merchant regex overrides | Catches edge cases Plaid miscategorizes (from budgeting-app) |
+| Rolling average must exclude current event | When comparing new value vs historical average, exclude the new value |
 
 ---
 

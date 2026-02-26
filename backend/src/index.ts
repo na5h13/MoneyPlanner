@@ -43,6 +43,7 @@ app.get('/health', (_req, res) => {
     has_encryption_key: !!process.env.ENCRYPTION_KEY,
     dev_mode: process.env.DEV_MODE === 'true',
     redirect_uri: process.env.PLAID_REDIRECT_URI || '(not set)',
+    android_package_name: process.env.PLAID_ANDROID_PACKAGE_NAME || '(not set)',
   });
 });
 

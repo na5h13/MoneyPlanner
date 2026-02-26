@@ -123,38 +123,84 @@ router.post('/exchange', async (req: Request, res: Response) => {
     const db = getFirestore();
     const { public_token, metadata } = req.body;
 
+    console.log('POST /accounts/exchange — userId:', req.uid);
+    console.log('  public_token present:', !!public_token, 'length:', public_token?.length);
+    console.log('  metadata:', JSON.stringify(metadata, null, 2));
+
     if (!public_token) {
       res.status(400).json({ error: 'public_token is required' });
       return;
     }
 
-    const result = await plaid.exchangePublicToken(public_token);
+    // Step 1: Exchange public token with Plaid
+    console.log('  Step 1: Exchanging public token with Plaid...');
+    let result;
+    try {
+      result = await plaid.exchangePublicToken(public_token);
+      console.log('  Step 1 OK: item_id =', result.item_id);
+    } catch (plaidErr: any) {
+      const plaidError = plaidErr?.response?.data;
+      const detail = plaidError?.error_message || plaidErr?.message || 'Unknown Plaid error';
+      const errorCode = plaidError?.error_code || '';
+      console.error('  Step 1 FAILED (Plaid exchange):', { detail, errorCode, plaidError });
+      res.status(502).json({ error: `Plaid exchange failed: ${detail}`, error_code: errorCode });
+      return;
+    }
 
-    // Encrypt access token before storing
-    const encryptedToken = encrypt(result.access_token);
+    // Step 2: Encrypt access token
+    console.log('  Step 2: Encrypting access token...');
+    let encryptedToken;
+    try {
+      encryptedToken = encrypt(result.access_token);
+      console.log('  Step 2 OK: encrypted token length =', encryptedToken.length);
+    } catch (encErr: any) {
+      console.error('  Step 2 FAILED (encryption):', encErr?.message);
+      res.status(500).json({ error: `Encryption failed: ${encErr?.message}` });
+      return;
+    }
 
-    // Store in user document
-    await db.collection('users').doc(req.uid).set({
-      [`plaid_items.${result.item_id}`]: {
-        access_token: encryptedToken,
-        institution_name: metadata?.institution?.name || 'Unknown',
-        institution_id: metadata?.institution?.institution_id || '',
+    // Step 3: Store in Firestore
+    // institution.id from Plaid SDK (not institution_id)
+    const institutionName = metadata?.institution?.name || 'Unknown';
+    const institutionId = metadata?.institution?.id || metadata?.institution?.institution_id || '';
+
+    console.log('  Step 3: Writing to Firestore...', { institutionName, institutionId });
+    try {
+      await db.collection('users').doc(req.uid).set({
+        [`plaid_items.${result.item_id}`]: {
+          access_token: encryptedToken,
+          institution_name: institutionName,
+          institution_id: institutionId,
+          connected_at: new Date().toISOString(),
+          cursor: '',
+          last_sync: null,
+        },
+      }, { merge: true });
+      console.log('  Step 3a OK: User doc updated');
+    } catch (fsErr: any) {
+      console.error('  Step 3a FAILED (Firestore user doc):', fsErr?.message);
+      res.status(500).json({ error: `Firestore write failed: ${fsErr?.message}` });
+      return;
+    }
+
+    // Step 4: Write item_id → user_id index for webhook handler lookup
+    try {
+      await db.collection('plaid_item_users').doc(result.item_id).set({
+        user_id: req.uid,
         connected_at: new Date().toISOString(),
-        cursor: '',
-        last_sync: null,
-      },
-    }, { merge: true });
+      });
+      console.log('  Step 4 OK: plaid_item_users index written');
+    } catch (fsErr: any) {
+      // Non-fatal — webhook lookup index, log but continue
+      console.error('  Step 4 WARN (plaid_item_users index):', fsErr?.message);
+    }
 
-    // Write item_id → user_id index for webhook handler lookup
-    await db.collection('plaid_item_users').doc(result.item_id).set({
-      user_id: req.uid,
-      connected_at: new Date().toISOString(),
-    });
-
+    console.log('  Exchange complete — item_id:', result.item_id);
     res.json({ data: { item_id: result.item_id, success: true } });
-  } catch (err) {
-    console.error('POST /accounts/exchange error:', err);
-    res.status(500).json({ error: 'Failed to exchange token' });
+  } catch (err: any) {
+    const msg = err?.message || 'Unknown error';
+    console.error('POST /accounts/exchange unexpected error:', msg, err?.stack);
+    res.status(500).json({ error: `Exchange failed: ${msg}` });
   }
 });
 
