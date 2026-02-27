@@ -8,7 +8,7 @@ import { View, StyleSheet } from 'react-native';
 import { GlassCard } from '@/src/components/ui/Glass';
 import { HeroText, SectionHeader, Sublabel, DataText } from '@/src/components/ui/Typography';
 import { colors, spacing } from '@/src/theme';
-import { formatAmount, amountColor } from '@/src/utils/formatAmount';
+import { formatAmountUnsigned, formatAmountSigned, amountColorFromFlag } from '@/src/utils/formatAmount';
 
 interface SummaryBarProps {
   income: number;       // cents
@@ -26,15 +26,15 @@ export function SummaryBar({ income, committed, oneTime, safeToSpend }: SummaryB
     >
       <View style={styles.content}>
         <SectionHeader style={styles.label}>SAFE TO SPEND</SectionHeader>
-        <HeroText style={{ color: amountColor(-safeToSpend) }}>
-          {formatAmount(-safeToSpend)}
+        <HeroText style={{ color: amountColorFromFlag(safeToSpend >= 0) }}>
+          {formatAmountSigned(Math.abs(safeToSpend), safeToSpend >= 0)}
         </HeroText>
 
         <View style={styles.breakdown}>
           <View style={styles.breakdownItem}>
             <Sublabel style={styles.breakdownLabel}>INCOME</Sublabel>
             <DataText style={[styles.breakdownValue, { color: colors.data.surplus }]}>
-              {formatAmount(-income)}
+              {formatAmountUnsigned(income)}
             </DataText>
           </View>
 
@@ -43,7 +43,7 @@ export function SummaryBar({ income, committed, oneTime, safeToSpend }: SummaryB
           <View style={styles.breakdownItem}>
             <Sublabel style={styles.breakdownLabel}>COMMITTED</Sublabel>
             <DataText style={[styles.breakdownValue, { color: colors.brand.deepSage }]}>
-              {formatAmount(committed)}
+              {formatAmountUnsigned(committed)}
             </DataText>
           </View>
 
@@ -53,7 +53,7 @@ export function SummaryBar({ income, committed, oneTime, safeToSpend }: SummaryB
               <View style={styles.breakdownItem}>
                 <Sublabel style={styles.breakdownLabel}>ONE-TIME</Sublabel>
                 <DataText style={[styles.breakdownValue, { color: colors.data.warning }]}>
-                  {formatAmount(oneTime)}
+                  {formatAmountUnsigned(oneTime)}
                 </DataText>
               </View>
             </>

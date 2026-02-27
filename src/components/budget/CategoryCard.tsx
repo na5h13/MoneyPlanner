@@ -1,6 +1,7 @@
-// Category Card — OpenSpec Section 21, Functions 5 + 6 (M5: Trending Column)
-// Collapsible category cards with line items, budget targets, progress bar,
-// trending projection (daily run-rate → month-end), status badge (ON_TRACK/WATCH/OVER)
+// Category Card — OpenSpec Section 21, Functions 5 + 6
+// Collapsible category cards with dual Budget/Trending columns,
+// $spent/$target header, classification badges, per-item trending,
+// status indicators (watch/over), progress bar, warning glow
 
 import React, { useState, useCallback } from 'react';
 import {
@@ -19,7 +20,7 @@ import {
 } from '@/src/components/ui/Typography';
 import { colors, spacing, fonts } from '@/src/theme';
 import { BudgetCategoryDisplay, BudgetLineItem, TrendingStatus, ClassificationType } from '@/src/types';
-import { formatAmount } from '@/src/utils/formatAmount';
+import { formatAmountUnsigned } from '@/src/utils/formatAmount';
 
 interface CategoryCardProps {
   data: BudgetCategoryDisplay;
@@ -42,6 +43,22 @@ function classificationBadge(type: ClassificationType): string {
   }
 }
 
+// Per-item trending prefix: ✓ posted, ~ estimated
+function trendingPrefix(item: BudgetLineItem): string {
+  if (!item.item_trending) return '';
+  if (item.item_trending.posted) return '\u2713';  // ✓
+  if (item.classification_type === 'RECURRING_VARIABLE') return '~';
+  return '';
+}
+
+// Per-item status indicator
+function itemStatusIcon(item: BudgetLineItem): string {
+  if (!item.item_trending) return '';
+  if (item.item_trending.status === 'over') return '\u25B2';   // ▲
+  if (item.item_trending.status === 'watch') return '\u26A0';  // ⚠
+  return '';
+}
+
 // Status → color mapping (NNR-COLOR: NO RED ever)
 function statusColor(status: TrendingStatus): string {
   switch (status) {
@@ -54,15 +71,6 @@ function statusColor(status: TrendingStatus): string {
 
 function statusGlow(status: TrendingStatus): 'warning' | undefined {
   return status === 'OVER' ? 'warning' : undefined;
-}
-
-function statusLabel(status: TrendingStatus): string | null {
-  switch (status) {
-    case 'ON_TRACK': return 'ON TRACK';
-    case 'WATCH':    return 'WATCH';
-    case 'OVER':     return 'OVER';
-    default:         return null;
-  }
 }
 
 export function CategoryCard({
@@ -79,6 +87,7 @@ export function CategoryCard({
   const targetAmount = target?.target_amount || 0;
   const trendingStatus = trending?.status || 'NO_TARGET';
   const projected = trending?.projected || 0;
+  const isOver = trendingStatus === 'OVER';
 
   const [editingTarget, setEditingTarget] = useState(false);
   const [targetInput, setTargetInput] = useState('');
@@ -156,15 +165,12 @@ export function CategoryCard({
   // Progress bar calculations
   const spentPct = targetAmount > 0 ? Math.min((spent / targetAmount) * 100, 100) : 0;
   const projectedPct = targetAmount > 0 ? Math.min((projected / targetAmount) * 100, 145) : 0;
-
-  // Show trending projection when we have enough data
   const showTrending = (
     trendingStatus === 'ON_TRACK' ||
     trendingStatus === 'WATCH' ||
     trendingStatus === 'OVER'
   ) && projected > 0;
 
-  const badge = statusLabel(trendingStatus);
   const sColor = statusColor(trendingStatus);
 
   return (
@@ -174,131 +180,126 @@ export function CategoryCard({
       style={styles.card}
     >
       <View style={styles.cardInner}>
-        {/* Category Header — tap to collapse/expand */}
+        {/* Category Header: name left, $spent / $target right */}
         <TouchableOpacity onPress={handleHeaderPress} activeOpacity={0.7} style={styles.header}>
           <View style={styles.headerLeft}>
             <BodyBold style={styles.categoryName}>{category.name}</BodyBold>
             <BodySmall style={styles.collapseIndicator}>
-              {isCollapsed ? '▸' : '▾'}
+              {isCollapsed ? '\u25B8' : '\u25BE'}
             </BodySmall>
           </View>
 
-          {/* Right: SPENT → PROJECTED + STATUS BADGE */}
           <View style={styles.headerRight}>
-            <View style={styles.headerMetrics}>
-              <View style={styles.headerMetric}>
-                <Sublabel style={styles.metricLabel}>SPENT</Sublabel>
-                <DataText style={styles.metricAmount}>
-                  {formatAmount(-spent)}
-                </DataText>
-              </View>
-
-              {showTrending && (
-                <>
-                  <Sublabel style={styles.metricArrow}>→</Sublabel>
-                  <View style={styles.headerMetric}>
-                    <Sublabel style={[styles.metricLabel, { color: sColor }]}>PROJ</Sublabel>
-                    <DataText style={[styles.metricAmount, { color: sColor }]}>
-                      {formatAmount(-projected)}
-                    </DataText>
-                  </View>
-                </>
+            <DataText style={[styles.headerAmount, isOver && { color: colors.data.warning }]}>
+              {formatAmountUnsigned(spent)}
+              {targetAmount > 0 && (
+                <DataText style={styles.headerTarget}>/{formatAmountUnsigned(targetAmount)}</DataText>
               )}
-
-              {!showTrending && targetAmount > 0 && (
-                <Sublabel style={styles.ofTarget}>
-                  of {formatAmount(-targetAmount)}
-                </Sublabel>
-              )}
-            </View>
-
-            {badge && (
-              <View style={[styles.statusBadge, { borderColor: sColor + '55' }]}>
-                <Sublabel style={[styles.statusText, { color: sColor }]}>
-                  {badge}
-                </Sublabel>
-              </View>
-            )}
+            </DataText>
+            {isOver && <BodySmall style={styles.overIndicator}>{'\u25B2'}</BodySmall>}
           </View>
         </TouchableOpacity>
 
-        {/* Progress bar: projected (faded) behind spent (solid) */}
+        {/* Progress bar */}
         {targetAmount > 0 && (
           <View style={styles.progressContainer}>
             <View style={styles.progressBg}>
-              {/* Projected fill — faded, behind spent */}
               {showTrending && projectedPct > spentPct && (
                 <View
                   style={[
                     styles.progressFill,
-                    {
-                      width: `${projectedPct}%`,
-                      backgroundColor: sColor + '28',
-                    },
+                    { width: `${projectedPct}%`, backgroundColor: sColor + '28' },
                   ]}
                 />
               )}
-              {/* Spent fill — solid, on top */}
               <View
                 style={[
                   styles.progressFill,
-                  {
-                    width: `${spentPct}%`,
-                    backgroundColor: sColor,
-                  },
+                  { width: `${spentPct}%`, backgroundColor: sColor },
                 ]}
               />
-              {/* Budget marker at 100% */}
               <View style={styles.budgetMarker} />
             </View>
           </View>
         )}
 
-        {/* Expanded content */}
+        {/* Expanded content — dual columns */}
         {!isCollapsed && (
           <View style={styles.expandedContent}>
-            {/* Column headers */}
+            {/* Dual column headers */}
             <View style={styles.columnHeaders}>
-              <Sublabel style={styles.colHeaderLeft}>ITEM</Sublabel>
-              <Sublabel style={styles.colHeaderRight}>BUDGET</Sublabel>
+              <Sublabel style={styles.colHeaderItem}>{/* badge space */}</Sublabel>
+              <Sublabel style={styles.colHeaderName}>ITEM</Sublabel>
+              <Sublabel style={styles.colHeaderBudget}>BUDGET</Sublabel>
+              <Sublabel style={styles.colHeaderTrending}>TRENDING</Sublabel>
+              <Sublabel style={styles.colHeaderStatus}>{/* status */}</Sublabel>
             </View>
 
-            {/* Line items */}
-            {line_items.map((item) => (
-              <TouchableOpacity
-                key={item.id}
-                onLongPress={() => handleLongPressItem(item)}
-                activeOpacity={0.8}
-                style={styles.lineItem}
-              >
-                <View style={styles.lineItemLeft}>
-                  <BodySmall numberOfLines={1} style={styles.lineItemName}>
-                    {item.display_name}
-                  </BodySmall>
-                </View>
-                {item.classification_type && classificationBadge(item.classification_type) ? (
-                  <TouchableOpacity
-                    onLongPress={() => handleLongPressClassification(item)}
-                    activeOpacity={0.7}
-                    style={styles.classBadge}
-                  >
-                    <Sublabel style={styles.classBadgeText}>
-                      {classificationBadge(item.classification_type)}
-                    </Sublabel>
-                  </TouchableOpacity>
-                ) : null}
-                <DataText style={styles.lineItemAmount}>
-                  {item.budget_amount ? formatAmount(-item.budget_amount) : '—'}
-                </DataText>
+            {/* Line items — 4-column: badge+name | budget | trending | status */}
+            {line_items.map((item) => {
+              const badge = item.classification_type ? classificationBadge(item.classification_type) : '';
+              const prefix = trendingPrefix(item);
+              const statusIcon = itemStatusIcon(item);
+              const itemOver = item.item_trending?.status === 'over';
+              const itemWatch = item.item_trending?.status === 'watch';
+
+              return (
                 <TouchableOpacity
-                  onPress={() => handleDeleteItem(item)}
-                  style={styles.lineDeleteBtn}
-                  activeOpacity={0.6}
+                  key={item.id}
+                  onLongPress={() => handleLongPressItem(item)}
+                  activeOpacity={0.8}
+                  style={styles.lineItem}
                 >
-                  <BodySmall style={styles.lineDeleteText}>×</BodySmall>
+                  {/* Classification badge */}
+                  {badge ? (
+                    <TouchableOpacity
+                      onLongPress={() => handleLongPressClassification(item)}
+                      activeOpacity={0.7}
+                      style={styles.classBadge}
+                    >
+                      <Sublabel style={styles.classBadgeText}>{badge}</Sublabel>
+                    </TouchableOpacity>
+                  ) : (
+                    <View style={styles.classBadgeSpacer} />
+                  )}
+
+                  {/* Item name */}
+                  <View style={styles.lineItemName}>
+                    <BodySmall numberOfLines={1} style={styles.lineItemNameText}>
+                      {item.display_name}
+                    </BodySmall>
+                  </View>
+
+                  {/* Budget amount (unsigned) */}
+                  <DataText style={styles.lineItemBudget}>
+                    {item.budget_amount ? formatAmountUnsigned(item.budget_amount) : '\u2014'}
+                  </DataText>
+
+                  {/* Trending amount */}
+                  <DataText style={[
+                    styles.lineItemTrending,
+                    itemOver && { color: colors.data.warning, fontWeight: '700' },
+                    itemWatch && { color: colors.data.warning },
+                  ]}>
+                    {item.item_trending
+                      ? `${prefix}${formatAmountUnsigned(item.item_trending.amount)}`
+                      : '\u2014'}
+                  </DataText>
+
+                  {/* Status indicator */}
+                  <View style={styles.lineItemStatus}>
+                    {statusIcon ? (
+                      <BodySmall style={[
+                        styles.statusIndicator,
+                        { color: colors.data.warning },
+                      ]}>
+                        {statusIcon}
+                      </BodySmall>
+                    ) : null}
+                  </View>
                 </TouchableOpacity>
-              </TouchableOpacity>
-            ))}
+              );
+            })}
 
             {/* Budget target row — tap to edit */}
             <View style={styles.targetRow}>
@@ -318,7 +319,7 @@ export function CategoryCard({
               ) : (
                 <TouchableOpacity onPress={handleTargetPress} activeOpacity={0.6}>
                   <DataText style={styles.targetValue}>
-                    {targetAmount ? formatAmount(-targetAmount) : 'Set target'}
+                    {targetAmount ? formatAmountUnsigned(targetAmount) : 'Set target'}
                   </DataText>
                 </TouchableOpacity>
               )}
@@ -362,18 +363,17 @@ const styles = StyleSheet.create({
     padding: spacing.lg,
   },
 
-  // Header
+  // Header: category name | $spent/$target
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'flex-start',
+    alignItems: 'center',
   },
   headerLeft: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
     flex: 1,
-    paddingTop: 2,
   },
   categoryName: {
     fontSize: 14,
@@ -383,54 +383,22 @@ const styles = StyleSheet.create({
     fontSize: 10,
     color: colors.data.neutral,
   },
-
-  // Right side: metrics + status badge
   headerRight: {
-    alignItems: 'flex-end',
-    gap: 4,
-  },
-  headerMetrics: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 4,
   },
-  headerMetric: {
-    alignItems: 'flex-end',
-  },
-  metricLabel: {
-    fontSize: 7,
-    textTransform: 'uppercase',
-    letterSpacing: 0.4,
-    color: colors.data.neutral,
-    marginBottom: 1,
-  },
-  metricAmount: {
-    fontSize: 12,
+  headerAmount: {
+    fontSize: 13,
     color: colors.brand.deepSage,
   },
-  metricArrow: {
-    fontSize: 9,
+  headerTarget: {
+    fontSize: 11,
     color: colors.data.neutral,
-    marginTop: 10,
   },
-  ofTarget: {
-    fontSize: 9,
-    color: colors.data.neutral,
-    marginTop: 10,
-  },
-
-  // Status badge
-  statusBadge: {
-    borderWidth: 1,
-    borderRadius: 4,
-    paddingHorizontal: 5,
-    paddingVertical: 2,
-  },
-  statusText: {
-    fontSize: 7,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    fontWeight: '600',
+  overIndicator: {
+    fontSize: 10,
+    color: colors.data.warning,
   },
 
   // Progress bar
@@ -467,30 +435,49 @@ const styles = StyleSheet.create({
   expandedContent: {
     marginTop: spacing.lg,
   },
+
+  // Dual column headers
   columnHeaders: {
     flexDirection: 'row',
+    alignItems: 'center',
     paddingBottom: spacing.sm,
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: 'rgba(218,224,224,0.18)',
     marginBottom: spacing.sm,
   },
-  colHeaderLeft: {
+  colHeaderItem: {
+    width: 24,
+    fontSize: 8,
+  },
+  colHeaderName: {
     flex: 1,
     textTransform: 'uppercase',
     letterSpacing: 0.4,
     fontSize: 8,
     fontWeight: '600',
   },
-  colHeaderRight: {
-    width: 65,
+  colHeaderBudget: {
+    width: 70,
     textAlign: 'right',
     textTransform: 'uppercase',
     letterSpacing: 0.4,
     fontSize: 8,
     fontWeight: '600',
   },
+  colHeaderTrending: {
+    width: 74,
+    textAlign: 'right',
+    textTransform: 'uppercase',
+    letterSpacing: 0.4,
+    fontSize: 8,
+    fontWeight: '600',
+  },
+  colHeaderStatus: {
+    width: 16,
+    fontSize: 8,
+  },
 
-  // Line items
+  // Line items — 5 columns: badge | name | budget | trending | status
   lineItem: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -498,26 +485,15 @@ const styles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: 'rgba(218,224,224,0.10)',
   },
-  lineItemLeft: {
-    flex: 1,
-  },
-  lineItemName: {
-    fontSize: 12,
-    color: colors.brand.deepSage,
-  },
-  lineItemAmount: {
-    width: 65,
-    textAlign: 'right',
-    fontSize: 11,
-    color: colors.brand.deepSage,
-  },
   classBadge: {
+    width: 22,
     borderWidth: 1,
     borderColor: 'rgba(138,138,138,0.35)',
     borderRadius: 3,
-    paddingHorizontal: 3,
+    paddingHorizontal: 2,
     paddingVertical: 1,
-    marginRight: 4,
+    marginRight: 2,
+    alignItems: 'center',
   },
   classBadgeText: {
     fontSize: 7,
@@ -525,18 +501,34 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     letterSpacing: 0.3,
   },
-  lineDeleteBtn: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginLeft: spacing.sm,
+  classBadgeSpacer: {
+    width: 24,
   },
-  lineDeleteText: {
-    fontSize: 14,
-    color: colors.data.neutral,
-    fontWeight: '600',
+  lineItemName: {
+    flex: 1,
+  },
+  lineItemNameText: {
+    fontSize: 12,
+    color: colors.brand.deepSage,
+  },
+  lineItemBudget: {
+    width: 70,
+    textAlign: 'right',
+    fontSize: 11,
+    color: colors.brand.deepSage,
+  },
+  lineItemTrending: {
+    width: 74,
+    textAlign: 'right',
+    fontSize: 11,
+    color: colors.brand.deepSage,
+  },
+  lineItemStatus: {
+    width: 16,
+    alignItems: 'center',
+  },
+  statusIndicator: {
+    fontSize: 10,
   },
 
   // Target row

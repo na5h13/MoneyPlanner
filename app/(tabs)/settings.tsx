@@ -1,7 +1,8 @@
 // Settings Screen — OpenSpec Section 21, Function 4
-// Accounts list (type icon, last-4, balance), Plaid Link for adding accounts,
-// Account hide/show, Category management (create, edit, delete, reorder with drag handles),
-// Preferences (budget period, currency, notifications), Manual sync, CSV export, Plaid disconnect
+// Accounts: SVG bank/card icons, last-4, balance (or used/limit for credit), chevron
+// Categories: drag handle + name + chevron
+// Preferences: budget period, currency (CAD), notifications toggle
+// Bottom: Disconnect Plaid, Sign Out (centered, amber)
 
 import React, { useEffect, useState, useCallback } from 'react';
 import {
@@ -13,6 +14,7 @@ import {
   ActivityIndicator,
   Switch,
 } from 'react-native';
+import Svg, { Path, Rect } from 'react-native-svg';
 import auth from '@react-native-firebase/auth';
 import { GoogleSignin } from '@react-native-google-signin/google-signin';
 import { create as plaidCreate, open as plaidOpen, destroy as plaidDestroy } from 'react-native-plaid-link-sdk';
@@ -26,12 +28,43 @@ import {
   DataText,
   Sublabel,
 } from '@/src/components/ui/Typography';
-import { AmountText } from '@/src/components/ui/AmountText';
 import { CategoryEditor } from '@/src/components/budget/CategoryEditor';
 import { colors, spacing, fonts } from '@/src/theme';
 import { useBudgetStore } from '@/src/stores/budgetStore';
 import { categoryApi, accountApi, settingsApi } from '@/src/services/api';
 import { Account, Category } from '@/src/types';
+import { formatAmountUnsigned } from '@/src/utils/formatAmount';
+
+// SVG bank icon (NNR-ICON: no emoji)
+function BankIcon() {
+  return (
+    <Svg width={18} height={18} viewBox="0 0 24 24" fill="none">
+      <Path
+        d="M3 21h18v-2H3v2zm0-4h18v-6H3v6zm0-8h18l-9-5-9 5z"
+        fill={colors.brand.steelBlue}
+      />
+    </Svg>
+  );
+}
+
+// SVG credit card icon (NNR-ICON: no emoji)
+function CardIcon() {
+  return (
+    <Svg width={18} height={18} viewBox="0 0 24 24" fill="none">
+      <Rect x={2} y={5} width={20} height={14} rx={2} stroke={colors.brand.steelBlue} strokeWidth={1.5} />
+      <Path d="M2 10h20" stroke={colors.brand.steelBlue} strokeWidth={1.5} />
+    </Svg>
+  );
+}
+
+// Chevron right
+function Chevron() {
+  return (
+    <Svg width={8} height={14} viewBox="0 0 8 14" fill="none">
+      <Path d="M1 1l6 6-6 6" stroke={colors.data.neutral} strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" />
+    </Svg>
+  );
+}
 
 export default function SettingsScreen() {
   const {
@@ -49,10 +82,9 @@ export default function SettingsScreen() {
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
   const [categoryEditorVisible, setCategoryEditorVisible] = useState(false);
   const [isCreatingCategory, setIsCreatingCategory] = useState(false);
-  const [isSyncing, setIsSyncing] = useState(false);
-  const [isExporting, setIsExporting] = useState(false);
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
-  const [budgetPeriod, setBudgetPeriod] = useState('monthly');
+  const [budgetPeriod, setBudgetPeriod] = useState('Monthly');
+  const [currency, setCurrency] = useState('CAD');
 
   useEffect(() => {
     fetchAccounts();
@@ -65,7 +97,9 @@ export default function SettingsScreen() {
       const res = await settingsApi.get();
       if (res.data) {
         setNotificationsEnabled(res.data.notifications_enabled ?? true);
-        setBudgetPeriod(res.data.budget_period || 'monthly');
+        const period = res.data.budget_period || 'monthly';
+        setBudgetPeriod(period.charAt(0).toUpperCase() + period.slice(1));
+        setCurrency(res.data.currency || 'CAD');
       }
     } catch {
       // Use defaults
@@ -75,39 +109,24 @@ export default function SettingsScreen() {
   // === Account Actions ===
   const handleAddAccount = useCallback(async () => {
     try {
-      // 1. Get a link token from backend
       const res = await accountApi.createLinkToken();
       const linkToken = res.link_token;
-
-      // 2. Clear any prior Plaid session
       await plaidDestroy();
-
-      // 3. Initialize Plaid Link (noLoadingState prevents blank screen)
       const plaidConfig: any = { token: linkToken, noLoadingState: true };
       plaidCreate(plaidConfig);
-
-      // 4. Open Plaid Link
       plaidOpen({
         onSuccess: async (success) => {
           try {
-            console.log('Plaid onSuccess — exchanging token...');
-            console.log('  publicToken:', success.publicToken?.substring(0, 15) + '...');
-            console.log('  institution:', JSON.stringify(success.metadata?.institution));
-            // Exchange public token for access token
             await accountApi.exchangeToken(success.publicToken, success.metadata);
-            console.log('Exchange successful — fetching accounts...');
-            // Sync transactions for the new account
             await fetchAccounts();
             syncTransactions();
             Alert.alert('Account Linked', 'Your bank account has been connected successfully.');
           } catch (exchangeErr: any) {
             const detail = exchangeErr?.data?.error || exchangeErr?.message || 'Unknown error';
-            console.error('Exchange failed:', detail, exchangeErr);
             Alert.alert('Exchange Error', detail);
           }
         },
         onExit: (exit) => {
-          console.log('Plaid onExit:', JSON.stringify(exit));
           if (exit?.error?.errorMessage) {
             Alert.alert('Link Error', exit.error.errorMessage);
           }
@@ -119,10 +138,6 @@ export default function SettingsScreen() {
     }
   }, [fetchAccounts, syncTransactions]);
 
-  const handleToggleAccount = useCallback(async (id: string) => {
-    await toggleAccountHidden(id);
-  }, [toggleAccountHidden]);
-
   const handleSignOut = useCallback(() => {
     Alert.alert('Sign Out', 'Are you sure you want to sign out?', [
       { text: 'Cancel', style: 'cancel' },
@@ -133,7 +148,6 @@ export default function SettingsScreen() {
           try {
             await GoogleSignin.signOut();
             await auth().signOut();
-            // _layout.tsx auth router redirects to /auth/login
           } catch {
             Alert.alert('Error', 'Failed to sign out');
           }
@@ -217,25 +231,6 @@ export default function SettingsScreen() {
     }
   }, [isCreatingCategory, editingCategory, fetchCategories]);
 
-  // === Sync ===
-  const handleSync = useCallback(async () => {
-    setIsSyncing(true);
-    await syncTransactions();
-    setIsSyncing(false);
-  }, [syncTransactions]);
-
-  // === Export ===
-  const handleExport = useCallback(async () => {
-    setIsExporting(true);
-    try {
-      await settingsApi.export();
-      Alert.alert('Export', 'CSV export generated successfully.');
-    } catch {
-      Alert.alert('Error', 'Failed to export data');
-    }
-    setIsExporting(false);
-  }, []);
-
   // === Preferences ===
   const handleNotificationToggle = useCallback(async (value: boolean) => {
     setNotificationsEnabled(value);
@@ -246,15 +241,31 @@ export default function SettingsScreen() {
     }
   }, []);
 
-  // Account type icon (text-based, no emoji per spec — using abbreviated labels)
-  const accountTypeLabel = (type: string): string => {
-    switch (type) {
-      case 'depository': return 'DEP';
-      case 'credit': return 'CC';
-      case 'loan': return 'LN';
-      case 'investment': return 'INV';
-      default: return 'ACC';
+  // Account display helpers
+  const isCredit = (account: Account) =>
+    account.type === 'credit' || account.subtype === 'credit card';
+
+  const renderAccountBalance = (account: Account) => {
+    if (isCredit(account)) {
+      const used = Math.abs(account.balance_current || 0);
+      const limit = account.balance_limit || 0;
+      return (
+        <DataText style={styles.accountBalance}>
+          {formatAmountUnsigned(used)} / {formatAmountUnsigned(limit)}
+        </DataText>
+      );
     }
+    const balance = account.balance_available ?? account.balance_current ?? 0;
+    return (
+      <View>
+        <DataText style={styles.accountBalance}>
+          {formatAmountUnsigned(Math.abs(balance))}
+          {account.balance_available != null && (
+            <Sublabel style={styles.availableLabel}> available</Sublabel>
+          )}
+        </DataText>
+      </View>
+    );
   };
 
   return (
@@ -264,9 +275,9 @@ export default function SettingsScreen() {
           <ScreenName>Settings</ScreenName>
         </View>
 
-        {/* === ACCOUNTS SECTION === */}
+        {/* === ACCOUNTS === */}
         <View style={styles.section}>
-          <SectionHeader>LINKED ACCOUNTS</SectionHeader>
+          <SectionHeader>ACCOUNTS</SectionHeader>
 
           {accountsLoading ? (
             <ActivityIndicator size="small" color={colors.brand.steelBlue} style={styles.loader} />
@@ -281,55 +292,43 @@ export default function SettingsScreen() {
             <GlassCard tier="standard" style={styles.card}>
               <View style={styles.cardContent}>
                 {accounts.map((account: Account, index: number) => (
-                  <View
+                  <TouchableOpacity
                     key={account.id}
+                    activeOpacity={0.6}
                     style={[
                       styles.accountRow,
-                      index < accounts.length - 1 && styles.accountRowBorder,
+                      index < accounts.length - 1 && styles.rowBorder,
                     ]}
                   >
-                    {/* Type icon */}
-                    <View style={styles.accountTypeIcon}>
-                      <BodySmall style={styles.accountTypeText}>
-                        {accountTypeLabel(account.type)}
-                      </BodySmall>
+                    {/* SVG icon */}
+                    <View style={styles.accountIcon}>
+                      {isCredit(account) ? <CardIcon /> : <BankIcon />}
                     </View>
 
-                    {/* Name + last 4 */}
+                    {/* Name + mask + balance */}
                     <View style={styles.accountInfo}>
                       <BodyBold numberOfLines={1} style={styles.accountName}>
-                        {account.name}
+                        {account.name} {'\u00B7\u00B7\u00B7'}{account.mask}
                       </BodyBold>
-                      <Sublabel>···{account.mask}</Sublabel>
+                      {renderAccountBalance(account)}
                     </View>
 
-                    {/* Balance */}
-                    <AmountText
-                      cents={-(account.balance_current || 0)}
-                      fontSize={13}
-                    />
-
-                    {/* Hide/Show toggle */}
-                    <Switch
-                      value={!account.hidden}
-                      onValueChange={() => handleToggleAccount(account.id)}
-                      trackColor={{ false: colors.bg.misty, true: colors.brand.celadon }}
-                      thumbColor={colors.white}
-                      style={styles.toggleSwitch}
-                    />
-                  </View>
+                    {/* Chevron */}
+                    <View style={styles.chevronContainer}>
+                      <Chevron />
+                    </View>
+                  </TouchableOpacity>
                 ))}
               </View>
             </GlassCard>
           )}
 
-          {/* Add Account Button */}
           <TouchableOpacity onPress={handleAddAccount} style={styles.actionButton} activeOpacity={0.7}>
             <BodyBold style={styles.actionButtonText}>+ Add Account</BodyBold>
           </TouchableOpacity>
         </View>
 
-        {/* === CATEGORIES SECTION === */}
+        {/* === CATEGORIES === */}
         <View style={styles.section}>
           <SectionHeader>CATEGORIES</SectionHeader>
 
@@ -338,67 +337,53 @@ export default function SettingsScreen() {
               {categories
                 .sort((a, b) => a.sort_order - b.sort_order)
                 .map((category, index) => (
-                  <View
+                  <TouchableOpacity
                     key={category.id}
+                    onPress={() => handleEditCategory(category)}
+                    activeOpacity={0.6}
                     style={[
                       styles.categoryRow,
-                      index < categories.length - 1 && styles.categoryRowBorder,
+                      index < categories.length - 1 && styles.rowBorder,
                     ]}
                   >
                     {/* Drag handle */}
-                    <View style={styles.dragHandle}>
-                      <BodySmall style={styles.dragHandleText}>☰</BodySmall>
-                    </View>
+                    <BodySmall style={styles.dragHandle}>{'\u2630'}</BodySmall>
 
                     {/* Category name */}
-                    <TouchableOpacity
-                      onPress={() => handleEditCategory(category)}
-                      style={styles.categoryName}
-                      activeOpacity={0.6}
-                    >
+                    <View style={styles.categoryInfo}>
                       <BodyText>{category.name}</BodyText>
-                      {category.is_default && (
-                        <Sublabel style={styles.defaultBadge}>default</Sublabel>
-                      )}
-                    </TouchableOpacity>
+                    </View>
 
-                    {/* Delete */}
-                    {category.name !== 'Uncategorized' && (
-                      <TouchableOpacity
-                        onPress={() => handleDeleteCategory(category)}
-                        style={styles.deleteBtn}
-                        activeOpacity={0.6}
-                      >
-                        <BodySmall style={styles.deleteText}>×</BodySmall>
-                      </TouchableOpacity>
-                    )}
-                  </View>
+                    {/* Chevron */}
+                    <View style={styles.chevronContainer}>
+                      <Chevron />
+                    </View>
+                  </TouchableOpacity>
                 ))}
             </View>
           </GlassCard>
 
-          {/* Add Category Button */}
           <TouchableOpacity onPress={handleCreateCategory} style={styles.actionButton} activeOpacity={0.7}>
             <BodyBold style={styles.actionButtonText}>+ Add Category</BodyBold>
           </TouchableOpacity>
         </View>
 
-        {/* === PREFERENCES SECTION === */}
+        {/* === PREFERENCES === */}
         <View style={styles.section}>
           <SectionHeader>PREFERENCES</SectionHeader>
 
           <GlassCard tier="standard" style={styles.card}>
             <View style={styles.cardContent}>
               {/* Budget Period */}
-              <View style={[styles.prefRow, styles.prefRowBorder]}>
+              <View style={[styles.prefRow, styles.rowBorder]}>
                 <BodyText>Budget Period</BodyText>
                 <BodyBold style={styles.prefValue}>{budgetPeriod}</BodyBold>
               </View>
 
               {/* Currency */}
-              <View style={[styles.prefRow, styles.prefRowBorder]}>
+              <View style={[styles.prefRow, styles.rowBorder]}>
                 <BodyText>Currency</BodyText>
-                <BodyBold style={styles.prefValue}>USD</BodyBold>
+                <BodyBold style={styles.prefValue}>{currency}</BodyBold>
               </View>
 
               {/* Notifications */}
@@ -415,66 +400,18 @@ export default function SettingsScreen() {
           </GlassCard>
         </View>
 
-        {/* === ACTIONS SECTION === */}
-        <View style={styles.section}>
-          <SectionHeader>ACTIONS</SectionHeader>
-
-          <GlassCard tier="standard" style={styles.card}>
-            <View style={styles.cardContent}>
-              {/* Manual Sync */}
-              <TouchableOpacity
-                onPress={handleSync}
-                disabled={isSyncing}
-                style={[styles.prefRow, styles.prefRowBorder]}
-                activeOpacity={0.6}
-              >
-                <BodyText>Sync Now</BodyText>
-                {isSyncing ? (
-                  <ActivityIndicator size="small" color={colors.brand.steelBlue} />
-                ) : (
-                  <Sublabel>
-                    {syncStatus.last_synced_at
-                      ? `Last: ${new Date(syncStatus.last_synced_at).toLocaleTimeString()}`
-                      : 'Never synced'}
-                  </Sublabel>
-                )}
-              </TouchableOpacity>
-
-              {/* Export CSV */}
-              <TouchableOpacity
-                onPress={handleExport}
-                disabled={isExporting}
-                style={[styles.prefRow, styles.prefRowBorder]}
-                activeOpacity={0.6}
-              >
-                <BodyText>Export CSV</BodyText>
-                {isExporting && <ActivityIndicator size="small" color={colors.brand.steelBlue} />}
-              </TouchableOpacity>
-
-              {/* Disconnect */}
-              {accounts.length > 0 && (
-                <TouchableOpacity
-                  onPress={handleDisconnect}
-                  style={[styles.prefRow, styles.prefRowBorder]}
-                  activeOpacity={0.6}
-                >
-                  <BodyText style={styles.dangerText}>Disconnect Bank</BodyText>
-                </TouchableOpacity>
-              )}
-
-              {/* Sign Out */}
-              <TouchableOpacity
-                onPress={handleSignOut}
-                style={styles.prefRow}
-                activeOpacity={0.6}
-              >
-                <BodyText style={styles.dangerText}>Sign Out</BodyText>
-              </TouchableOpacity>
-            </View>
-          </GlassCard>
+        {/* === Bottom actions (centered, no card) === */}
+        <View style={styles.bottomActions}>
+          {accounts.length > 0 && (
+            <TouchableOpacity onPress={handleDisconnect} activeOpacity={0.6} style={styles.bottomAction}>
+              <BodyText style={styles.warningText}>Disconnect Plaid</BodyText>
+            </TouchableOpacity>
+          )}
+          <TouchableOpacity onPress={handleSignOut} activeOpacity={0.6} style={styles.bottomAction}>
+            <BodyText style={styles.warningText}>Sign Out</BodyText>
+          </TouchableOpacity>
         </View>
 
-        {/* Bottom padding for tab bar */}
         <View style={styles.bottomPad} />
       </ScrollView>
 
@@ -515,30 +452,26 @@ const styles = StyleSheet.create({
     marginBottom: spacing.xs,
   },
 
+  // Shared row border
+  rowBorder: {
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: 'rgba(218,224,224,0.18)',
+  },
+
   // Account rows
   accountRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 10,
-    gap: spacing.md,
+    paddingVertical: 12,
+    gap: spacing.lg,
   },
-  accountRowBorder: {
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: 'rgba(218,224,224,0.18)',
-  },
-  accountTypeIcon: {
+  accountIcon: {
     width: 32,
     height: 32,
     borderRadius: 8,
-    backgroundColor: 'rgba(81,105,122,0.1)',
+    backgroundColor: 'rgba(81,105,122,0.08)',
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  accountTypeText: {
-    fontSize: 9,
-    fontFamily: fonts.dataBold,
-    fontWeight: '600',
-    color: colors.brand.steelBlue,
   },
   accountInfo: {
     flex: 1,
@@ -546,54 +479,36 @@ const styles = StyleSheet.create({
   accountName: {
     fontSize: 13,
   },
-  toggleSwitch: {
-    marginLeft: spacing.sm,
-    transform: [{ scaleX: 0.7 }, { scaleY: 0.7 }],
+  accountBalance: {
+    fontSize: 12,
+    color: colors.data.neutral,
+    marginTop: 2,
+  },
+  availableLabel: {
+    fontSize: 9,
+    color: colors.data.neutral,
+  },
+  chevronContainer: {
+    width: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 
   // Category rows
   categoryRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 10,
+    paddingVertical: 12,
     gap: spacing.md,
-  },
-  categoryRowBorder: {
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: 'rgba(218,224,224,0.18)',
   },
   dragHandle: {
-    width: 20,
-    alignItems: 'center',
-  },
-  dragHandleText: {
     fontSize: 14,
     color: colors.data.neutral,
+    width: 20,
+    textAlign: 'center',
   },
-  categoryName: {
+  categoryInfo: {
     flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-  },
-  defaultBadge: {
-    fontSize: 8,
-    color: colors.data.neutral,
-    fontStyle: 'italic',
-  },
-  deleteBtn: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: 'rgba(139,114,96,0.1)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  deleteText: {
-    fontSize: 16,
-    color: colors.data.deficit,
-    fontWeight: '600',
-    lineHeight: 18,
   },
 
   // Action button
@@ -619,16 +534,24 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingVertical: 12,
   },
-  prefRowBorder: {
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: 'rgba(218,224,224,0.18)',
-  },
   prefValue: {
     color: colors.brand.steelBlue,
     fontSize: 13,
   },
-  dangerText: {
+
+  // Bottom actions (centered, no card)
+  bottomActions: {
+    alignItems: 'center',
+    gap: spacing.lg,
+    paddingHorizontal: spacing.xxl,
+    marginTop: spacing.lg,
+  },
+  bottomAction: {
+    paddingVertical: spacing.md,
+  },
+  warningText: {
     color: colors.data.warning,
+    textAlign: 'center',
   },
 
   bottomPad: {

@@ -6,11 +6,10 @@
 import React, { useEffect, useCallback, useMemo, useState } from 'react';
 import {
   View,
-  SectionList,
+  FlatList,
   StyleSheet,
   RefreshControl,
   ActivityIndicator,
-  Text,
 } from 'react-native';
 import { format, parseISO } from 'date-fns';
 import { AmbientBackground, GlassCard } from '@/src/components/ui/Glass';
@@ -20,9 +19,9 @@ import { FilterChips } from '@/src/components/ui/FilterChips';
 import { MonthNavigator } from '@/src/components/ui/MonthNavigator';
 import { TransactionRow } from '@/src/components/budget/TransactionRow';
 import { CategoryPicker } from '@/src/components/budget/CategoryPicker';
-import { colors, spacing, fonts } from '@/src/theme';
+import { colors, spacing } from '@/src/theme';
 import { useBudgetStore } from '@/src/stores/budgetStore';
-import { Transaction, TransactionFilter } from '@/src/types';
+import { Transaction } from '@/src/types';
 
 // Group transactions by date (newest first)
 function groupByDate(transactions: Transaction[]): Array<{ title: string; data: Transaction[] }> {
@@ -51,9 +50,10 @@ function formatDateHeader(dateStr: string): string {
   const yesterday = new Date(today);
   yesterday.setDate(yesterday.getDate() - 1);
 
-  if (dateStr === format(today, 'yyyy-MM-dd')) return 'Today';
-  if (dateStr === format(yesterday, 'yyyy-MM-dd')) return 'Yesterday';
-  return format(date, 'EEEE, MMMM d');
+  const shortDate = format(date, 'MMM d').toUpperCase();
+  if (dateStr === format(today, 'yyyy-MM-dd')) return `TODAY \u00B7 ${shortDate}`;
+  if (dateStr === format(yesterday, 'yyyy-MM-dd')) return `YESTERDAY \u00B7 ${shortDate}`;
+  return format(date, 'EEEE, MMMM d').toUpperCase();
 }
 
 export default function TransactionsScreen() {
@@ -102,8 +102,8 @@ export default function TransactionsScreen() {
     return () => clearTimeout(timer);
   }, [transactionSearch]);
 
-  // Group transactions by date
-  const sections = useMemo(() => groupByDate(transactions), [transactions]);
+  // Group transactions by date (for FlatList rendering)
+  const dateGroups = useMemo(() => groupByDate(transactions), [transactions]);
 
   // Pull-to-refresh → Plaid sync
   const handleRefresh = useCallback(async () => {
@@ -135,20 +135,27 @@ export default function TransactionsScreen() {
     setTransactionSearch(text);
   }, [setTransactionSearch]);
 
-  // Render date section header
-  const renderSectionHeader = useCallback(({ section }: { section: { title: string } }) => (
-    <View style={styles.sectionHeader}>
-      <SectionHeader>{section.title}</SectionHeader>
+  // Render a date group: header + glass card wrapping all transactions
+  const renderDateGroup = useCallback(({ item }: { item: { title: string; data: Transaction[] } }) => (
+    <View>
+      <View style={styles.sectionHeader}>
+        <SectionHeader>{item.title}</SectionHeader>
+      </View>
+      <GlassCard tier="standard">
+        <View style={styles.groupContent}>
+          {item.data.map((txn, index) => (
+            <View key={txn.id}>
+              {index > 0 && <View style={styles.txnDivider} />}
+              <TransactionRow
+                transaction={txn}
+                categoryName={txn.category_id ? categoryMap.get(txn.category_id) : undefined}
+                onPress={handleTransactionPress}
+              />
+            </View>
+          ))}
+        </View>
+      </GlassCard>
     </View>
-  ), []);
-
-  // Render transaction row
-  const renderItem = useCallback(({ item }: { item: Transaction }) => (
-    <TransactionRow
-      transaction={item}
-      categoryName={item.category_id ? categoryMap.get(item.category_id) : undefined}
-      onPress={handleTransactionPress}
-    />
   ), [categoryMap, handleTransactionPress]);
 
   // Empty state
@@ -209,15 +216,13 @@ export default function TransactionsScreen() {
           </View>
         )}
 
-        {/* Transaction List */}
-        <SectionList
-          sections={sections}
-          renderItem={renderItem}
-          renderSectionHeader={renderSectionHeader}
+        {/* Transaction List — grouped by date in glass cards */}
+        <FlatList
+          data={dateGroups}
+          renderItem={renderDateGroup}
           ListEmptyComponent={renderEmpty}
-          keyExtractor={(item) => item.id}
+          keyExtractor={(item) => item.title}
           contentContainerStyle={styles.listContent}
-          stickySectionHeadersEnabled={false}
           refreshControl={
             <RefreshControl
               refreshing={isRefreshing}
@@ -280,6 +285,14 @@ const styles = StyleSheet.create({
     paddingTop: spacing.xl,
     paddingBottom: spacing.sm,
     backgroundColor: 'transparent',
+  },
+  groupContent: {
+    paddingVertical: 4,
+  },
+  txnDivider: {
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: 'rgba(218,224,224,0.18)',
+    marginHorizontal: 12,
   },
   emptyContainer: {
     paddingTop: spacing.xxxl,

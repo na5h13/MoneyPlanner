@@ -1,37 +1,62 @@
 // Amount formatting utility — OpenSpec conventions
+// Backend stores ALL amounts as positive cents with is_income flag.
 // Expenses: -$X.XX in deep sage
 // Income: +$X.XX in surplus green
+// Budget: $X.XX unsigned (no sign prefix)
 // All amounts displayed in Source Code Pro monospace font
 // API returns amounts in cents (integer) to avoid floating-point precision issues
 
 import { colors } from '@/src/theme';
 
 /**
- * Format cents to display string.
+ * Format cents with comma grouping.
+ */
+function formatDollarValue(cents: number): string {
+  const abs = Math.abs(cents);
+  const dollars = abs / 100;
+  return dollars.toLocaleString('en-CA', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+/**
+ * Format cents using is_income flag (preferred — backend stores all amounts positive).
+ * Income → +$X,XXX.XX
+ * Expense → -$X,XXX.XX
+ */
+export function formatAmountSigned(cents: number, isIncome: boolean): string {
+  const formatted = formatDollarValue(cents);
+  if (cents === 0) return `$${formatted}`;
+  return isIncome ? `+$${formatted}` : `-$${formatted}`;
+}
+
+/**
+ * Color for amount based on is_income flag.
+ */
+export function amountColorFromFlag(isIncome: boolean): string {
+  return isIncome ? colors.data.surplus : colors.brand.deepSage;
+}
+
+/**
+ * Format cents unsigned for budget display — no +/- prefix.
+ * $X,XXX.XX
+ */
+export function formatAmountUnsigned(cents: number): string {
+  return `$${formatDollarValue(cents)}`;
+}
+
+/**
+ * Legacy: Format cents to display string using sign of cents value.
  * Plaid convention: positive = debit (expense), negative = credit (income).
  * Display convention: expenses show -$X.XX, income shows +$X.XX.
  */
 export function formatAmount(cents: number): string {
-  const abs = Math.abs(cents);
-  const dollars = (abs / 100).toFixed(2);
-  // Plaid: positive = money leaving account (expense)
-  // Plaid: negative = money entering account (income)
-  if (cents < 0) {
-    // Income (credit)
-    return `+$${dollars}`;
-  }
-  if (cents > 0) {
-    // Expense (debit)
-    return `-$${dollars}`;
-  }
-  return `$${dollars}`;
+  const formatted = formatDollarValue(cents);
+  if (cents < 0) return `+$${formatted}`;
+  if (cents > 0) return `-$${formatted}`;
+  return `$${formatted}`;
 }
 
 /**
- * Get the color for an amount based on sign.
- * Income (negative in Plaid) → surplus green
- * Expense (positive in Plaid) → deep sage
- * Zero → neutral
+ * Legacy: Get the color for an amount based on sign.
  */
 export function amountColor(cents: number): string {
   if (cents < 0) return colors.data.surplus;   // Income

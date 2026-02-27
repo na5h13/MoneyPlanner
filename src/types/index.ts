@@ -74,6 +74,13 @@ export interface BudgetTarget {
   updated_at: string;
 }
 
+// Per-line-item trending data (computed by backend)
+export interface ItemTrending {
+  posted: boolean;         // true if transaction matched this month
+  amount: number;          // cents — actual or estimated trending amount
+  status: 'ok' | 'watch' | 'over';  // per-item status indicator
+}
+
 export interface BudgetLineItem {
   id: string;
   user_id: string;
@@ -90,6 +97,8 @@ export interface BudgetLineItem {
   deleted_at: string | null;
   // Display-only — joined from spending_classifications (M8)
   classification_type?: ClassificationType;
+  // Per-item trending (computed by backend budget route)
+  item_trending?: ItemTrending;
 }
 
 export interface UserSettings {
