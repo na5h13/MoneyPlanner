@@ -60,6 +60,9 @@ app.get('/health', async (_req, res) => {
 app.post('/debug/migrate', async (_req, res) => {
   try {
     const db = getFirestore();
+    const admin = require('firebase-admin');
+    const FieldPath = admin.firestore.FieldPath;
+    const FieldValue = admin.firestore.FieldValue;
     const usersSnap = await db.collection('users').get();
     const results: any[] = [];
 
@@ -74,20 +77,18 @@ app.post('/debug/migrate', async (_req, res) => {
 
       // Build proper nested plaid_items from flat keys
       const nestedItems: Record<string, any> = data.plaid_items || {};
-      const deleteFields: Record<string, any> = {};
-
       for (const flatKey of flatKeys) {
         const itemId = flatKey.replace('plaid_items.', '');
         nestedItems[itemId] = data[flatKey];
-        // Mark flat key for deletion using FieldValue.delete()
-        deleteFields[flatKey] = require('firebase-admin').firestore.FieldValue.delete();
       }
 
-      // Write nested structure + delete flat keys
-      await userDoc.ref.update({
-        plaid_items: nestedItems,
-        ...deleteFields,
-      });
+      // Step 1: Write the correct nested structure
+      await userDoc.ref.set({ plaid_items: nestedItems }, { merge: true });
+
+      // Step 2: Delete each flat key using FieldPath (literal dot-containing field name)
+      for (const flatKey of flatKeys) {
+        await userDoc.ref.update(new FieldPath(flatKey), FieldValue.delete());
+      }
 
       results.push({
         userId: userDoc.id,
