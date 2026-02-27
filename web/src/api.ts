@@ -12,7 +12,11 @@ import type {
   UserSettings,
 } from './types';
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5050';
+// Production (Railway): VITE_API_BASE_URL="" → same origin (Express serves both API + SPA)
+// Local dev: VITE_API_BASE_URL not set → fallback to localhost:5050
+// Local dev with Railway: VITE_API_BASE_URL=https://web-production-794b4.up.railway.app
+const envUrl = import.meta.env.VITE_API_BASE_URL;
+const API_BASE_URL = envUrl !== undefined ? envUrl : 'http://localhost:5050';
 const DEV_MODE = import.meta.env.VITE_DEV_MODE === 'true';
 
 let getAuthToken: (() => Promise<string | null>) | null = null;

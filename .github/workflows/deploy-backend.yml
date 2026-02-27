@@ -1,10 +1,11 @@
-name: Deploy Backend to Railway
+name: Deploy to Railway
 
 on:
   push:
     branches: [main]
     paths:
       - 'backend/**'
+      - 'web/**'
       - 'railway.json'
   workflow_dispatch:
 

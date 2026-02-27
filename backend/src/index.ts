@@ -5,6 +5,7 @@ import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
+import path from 'path';
 import { initFirebase, getFirestore } from './services/firebaseAdmin';
 import { authMiddleware } from './middleware/auth';
 
@@ -23,7 +24,9 @@ const PORT = parseInt(process.env.PORT || '5050', 10);
 initFirebase();
 
 // Middleware
-app.use(helmet());
+app.use(helmet({
+  contentSecurityPolicy: false, // Vite SPA uses inline scripts/styles
+}));
 app.use(cors({
   origin: process.env.ALLOWED_ORIGINS === '*'
     ? '*'
@@ -74,7 +77,20 @@ app.post('/api/v1/export', authMiddleware, async (req, res) => {
   settingsRouter.handle(req, res, () => {});
 });
 
-// 404 handler
+// Serve web SPA static files (built by Vite into web/dist)
+const webDistPath = path.resolve(__dirname, '../../web/dist');
+app.use(express.static(webDistPath));
+
+// SPA fallback — serve index.html for all non-API GET requests
+// This enables client-side routing (React Router)
+app.get('*', (req, res, next) => {
+  if (req.path.startsWith('/api/')) return next();
+  res.sendFile(path.join(webDistPath, 'index.html'), (err) => {
+    if (err) next(); // If index.html doesn't exist, fall through to 404
+  });
+});
+
+// 404 handler (API routes that don't match)
 app.use((_req, res) => {
   res.status(404).json({ error: 'Not found' });
 });

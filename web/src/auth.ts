@@ -11,6 +11,7 @@ import {
   type Auth,
   type User,
 } from 'firebase/auth';
+import { firebaseConfig as defaultConfig } from './firebase-config';
 
 export type { User } from 'firebase/auth';
 
@@ -21,17 +22,13 @@ function getFirebaseAuth(): Auth {
   if (auth) return auth;
 
   const firebaseConfig = {
-    apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
-    authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
-    projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
-    storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
-    messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
-    appId: import.meta.env.VITE_FIREBASE_APP_ID,
+    apiKey: import.meta.env.VITE_FIREBASE_API_KEY || defaultConfig.apiKey,
+    authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || defaultConfig.authDomain,
+    projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || defaultConfig.projectId,
+    storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || defaultConfig.storageBucket,
+    messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || defaultConfig.messagingSenderId,
+    appId: import.meta.env.VITE_FIREBASE_APP_ID || defaultConfig.appId,
   };
-
-  if (!firebaseConfig.apiKey) {
-    throw new Error('Firebase config missing. Set VITE_FIREBASE_* env vars.');
-  }
 
   app = initializeApp(firebaseConfig);
   auth = getAuth(app);

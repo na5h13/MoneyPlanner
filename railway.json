@@ -2,10 +2,10 @@
   "$schema": "https://railway.com/railway.schema.json",
   "build": {
     "builder": "NIXPACKS",
-    "buildCommand": "npm install && npm run build"
+    "buildCommand": "cd backend && npm install && npm run build && cd ../web && npm install && VITE_API_BASE_URL= npm run build"
   },
   "deploy": {
-    "startCommand": "npm start",
+    "startCommand": "cd backend && node dist/index.js",
     "restartPolicyType": "ON_FAILURE",
     "restartPolicyMaxRetries": 10
   }
