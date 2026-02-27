@@ -13,50 +13,81 @@ interface CategorizeResult {
   source: 'merchant_rule' | 'historical' | 'plaid_map' | 'keyword' | 'fallback';
 }
 
-// Plaid personal_finance_category → OpenSpec category name mapping
+// Plaid personal_finance_category → app category name mapping
 const PLAID_CATEGORY_MAP: Record<string, string> = {
-  // Home & Personal
-  'RENT_AND_UTILITIES': 'Home & Personal',
-  'HOME_IMPROVEMENT': 'Home & Personal',
-  'PERSONAL_CARE': 'Home & Personal',
-  'MEDICAL': 'Home & Personal',
-  'INSURANCE': 'Home & Personal',
-  'TELECOMMUNICATION_SERVICES': 'Home & Personal',
-  'RENT': 'Home & Personal',
+  // Housing
+  'RENT_AND_UTILITIES': 'Utilities',
+  'RENT': 'Mortgage & Rent',
+  'HOME_IMPROVEMENT': 'Shopping',
 
-  // Food & Transportation
-  'FOOD_AND_DRINK': 'Food & Transportation',
-  'GROCERIES': 'Food & Transportation',
-  'RESTAURANTS': 'Food & Transportation',
-  'COFFEE': 'Food & Transportation',
-  'TRANSPORTATION': 'Food & Transportation',
-  'GAS_STATIONS': 'Food & Transportation',
-  'TAXI': 'Food & Transportation',
-  'PUBLIC_TRANSIT': 'Food & Transportation',
-  'PARKING': 'Food & Transportation',
+  // Utilities
+  'TELECOMMUNICATION_SERVICES': 'Utilities',
 
-  // Family
-  'CHILDCARE': 'Family',
-  'EDUCATION': 'Family',
-  'PET_CARE': 'Family',
+  // Insurance
+  'INSURANCE': 'Insurance',
+
+  // Groceries
+  'GROCERIES': 'Groceries',
+
+  // Dining & Takeout
+  'FOOD_AND_DRINK': 'Dining & Takeout',
+  'RESTAURANTS': 'Dining & Takeout',
+  'COFFEE': 'Dining & Takeout',
+  'FAST_FOOD': 'Dining & Takeout',
+
+  // Transportation
+  'TRANSPORTATION': 'Transportation',
+  'GAS_STATIONS': 'Transportation',
+  'TAXI': 'Transportation',
+  'PUBLIC_TRANSIT': 'Transportation',
+  'PARKING': 'Transportation',
+  'CAR_SERVICE': 'Transportation',
+  'CAR_DEALERS_AND_LEASING': 'Transportation',
+
+  // Shopping
+  'SHOPPING': 'Shopping',
+  'GENERAL_MERCHANDISE': 'Shopping',
+  'ELECTRONICS': 'Shopping',
+  'CLOTHING': 'Shopping',
+  'HOME_FURNISHINGS': 'Shopping',
+
+  // Family & Kids
+  'CHILDCARE': 'Family & Kids',
+  'EDUCATION': 'Family & Kids',
+  'PET_CARE': 'Family & Kids',
+
+  // Health & Wellness
+  'MEDICAL': 'Health & Wellness',
+  'PERSONAL_CARE': 'Personal Care',
+  'GYMS_AND_FITNESS_CENTERS': 'Health & Wellness',
+  'PHARMACIES': 'Health & Wellness',
+
+  // Subscriptions
+  'SUBSCRIPTIONS': 'Subscriptions',
+
+  // Entertainment & Social
+  'ENTERTAINMENT': 'Entertainment & Social',
+  'RECREATION': 'Entertainment & Social',
+  'MUSIC': 'Entertainment & Social',
+  'SPORTING_EVENTS': 'Entertainment & Social',
+
+  // Travel
+  'TRAVEL': 'Travel',
+  'AIRLINES_AND_AVIATION_SERVICES': 'Travel',
+  'LODGING': 'Travel',
+  'CAR_RENTAL': 'Travel',
 
   // Loans & Debt
   'LOAN_PAYMENTS': 'Loans & Debt',
   'CREDIT_CARD_PAYMENT': 'Loans & Debt',
-  'INTEREST': 'Loans & Debt',
-  'BANK_FEES': 'Loans & Debt',
 
-  // Entertainment & Other
-  'ENTERTAINMENT': 'Entertainment & Other',
-  'RECREATION': 'Entertainment & Other',
-  'SHOPPING': 'Entertainment & Other',
-  'GENERAL_MERCHANDISE': 'Entertainment & Other',
-  'ELECTRONICS': 'Entertainment & Other',
-  'CLOTHING': 'Entertainment & Other',
-  'SUBSCRIPTIONS': 'Entertainment & Other',
-  'TRAVEL': 'Entertainment & Other',
-  'AIRLINES_AND_AVIATION_SERVICES': 'Entertainment & Other',
-  'LODGING': 'Entertainment & Other',
+  // Fees & Charges
+  'BANK_FEES': 'Fees & Charges',
+  'INTEREST': 'Fees & Charges',
+
+  // Income
+  'INCOME': 'Income',
+  'TRANSFER_IN': 'Income',
 };
 
 function normalizeMerchant(name: string): string {

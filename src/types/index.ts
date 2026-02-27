@@ -39,11 +39,14 @@ export interface Transaction {
   categorized_by: 'auto' | 'user' | null;
 }
 
+export type CategoryGroup = 'Income' | 'Essentials' | 'Daily Living' | 'Family & Home' | 'Leisure' | 'Financial' | 'Uncategorized';
+
 export interface Category {
   id: string;
   user_id: string;
   name: string;
   icon: string;        // SVG identifier
+  group: CategoryGroup; // hierarchical grouping for budget drill-down
   sort_order: number;
   is_default: boolean;
   is_income: boolean;

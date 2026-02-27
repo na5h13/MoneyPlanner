@@ -175,6 +175,31 @@ router.put('/reorder', async (req: Request, res: Response) => {
   }
 });
 
+// POST /api/v1/categories/reset-defaults — delete all categories and re-seed with current defaults
+router.post('/reset-defaults', async (req: Request, res: Response) => {
+  try {
+    const db = getFirestore();
+    const catCollection = db.collection('users').doc(req.uid).collection('categories');
+
+    // Delete all existing categories
+    const allSnap = await catCollection.get();
+    if (!allSnap.empty) {
+      const batch = db.batch();
+      for (const doc of allSnap.docs) {
+        batch.delete(doc.ref);
+      }
+      await batch.commit();
+    }
+
+    // Re-seed with current defaults (ensureCategories checks if empty, which it now is)
+    const newCategories = await ensureCategories(req.uid);
+    res.json({ data: newCategories, message: `Reset to ${newCategories.length} default categories` });
+  } catch (err) {
+    console.error('POST /categories/reset-defaults error:', err);
+    res.status(500).json({ error: 'Failed to reset categories' });
+  }
+});
+
 // GET /api/v1/category-rules
 router.get('/rules', async (req: Request, res: Response) => {
   try {
