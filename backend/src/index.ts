@@ -56,6 +56,119 @@ app.get('/health', async (_req, res) => {
   });
 });
 
+// TEMPORARY DEBUG — traces accounts pipeline step by step (remove after fixing)
+app.get('/debug/accounts', async (_req, res) => {
+  const steps: any[] = [];
+  try {
+    const db = getFirestore();
+
+    // Step 1: List all user docs
+    const usersSnap = await db.collection('users').get();
+    const users = usersSnap.docs.map(d => d.id);
+    steps.push({ step: 1, desc: 'List users', users, count: users.length });
+
+    if (users.length === 0) {
+      res.json({ steps, error: 'No users in Firestore' });
+      return;
+    }
+
+    // Step 2: For each user, check plaid_items
+    for (const userId of users) {
+      const userDoc = await db.collection('users').doc(userId).get();
+      const userData = userDoc.data();
+      const plaidItems = userData?.plaid_items || {};
+      const itemIds = Object.keys(plaidItems);
+
+      steps.push({
+        step: 2,
+        desc: 'User plaid_items',
+        userId,
+        hasPlaidItems: itemIds.length > 0,
+        itemIds,
+        userDataKeys: Object.keys(userData || {}),
+      });
+
+      // Step 3: For each item, try decrypt + Plaid call
+      for (const itemId of itemIds) {
+        const itemData = plaidItems[itemId];
+        const tokenPreview = itemData.access_token
+          ? `${itemData.access_token.substring(0, 20)}...`
+          : '(missing)';
+
+        steps.push({
+          step: '3a',
+          desc: 'Item data',
+          itemId,
+          institution_name: itemData.institution_name,
+          has_access_token: !!itemData.access_token,
+          token_preview: tokenPreview,
+          cursor: itemData.cursor,
+          last_sync: itemData.last_sync,
+        });
+
+        // Step 3b: Try decrypt
+        try {
+          const { decrypt } = require('./utils/encryption');
+          const decrypted = decrypt(itemData.access_token);
+          steps.push({
+            step: '3b',
+            desc: 'Decrypt OK',
+            itemId,
+            decrypted_starts_with: decrypted.substring(0, 15) + '...',
+          });
+
+          // Step 3c: Try Plaid getAccounts
+          try {
+            const plaid = require('./services/plaidService');
+            const accounts = await plaid.getAccounts(decrypted);
+            steps.push({
+              step: '3c',
+              desc: 'Plaid getAccounts OK',
+              itemId,
+              accountCount: accounts.length,
+              accounts: accounts.map((a: any) => ({
+                id: a.account_id,
+                name: a.name,
+                type: a.type,
+                mask: a.mask,
+              })),
+            });
+          } catch (plaidErr: any) {
+            steps.push({
+              step: '3c',
+              desc: 'Plaid getAccounts FAILED',
+              itemId,
+              error: plaidErr?.message,
+              plaidError: plaidErr?.response?.data,
+            });
+          }
+        } catch (decryptErr: any) {
+          steps.push({
+            step: '3b',
+            desc: 'Decrypt FAILED',
+            itemId,
+            error: decryptErr?.message,
+          });
+        }
+      }
+
+      // Step 4: Check transactions collection
+      const txnSnap = await db.collection('users').doc(userId).collection('transactions').get();
+      steps.push({
+        step: 4,
+        desc: 'Transaction count',
+        userId,
+        transactionCount: txnSnap.size,
+      });
+    }
+
+    res.json({ steps });
+  } catch (err: any) {
+    steps.push({ step: 'fatal', error: err?.message, stack: err?.stack?.split('\n').slice(0, 3) });
+    res.json({ steps });
+  }
+});
+
 // Plaid webhooks — no auth (Plaid sends these)
 app.use('/api/v1/webhooks', webhookRoutes);
 
