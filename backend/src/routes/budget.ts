@@ -11,6 +11,7 @@
 
 import { Router, Request, Response } from 'express';
 import { getFirestore } from '../services/firebaseAdmin';
+import { ensureCategories } from '../services/ensureCategories';
 
 const router = Router();
 
@@ -27,7 +28,8 @@ router.get('/', async (req: Request, res: Response) => {
     const period = (req.query.period as string) || currentPeriod();
     const [year, month] = period.split('-').map(Number);
 
-    // Get categories
+    // Get categories (seeds defaults if none exist)
+    await ensureCategories(userId);
     const catSnap = await db
       .collection('users').doc(userId).collection('categories')
       .orderBy('sort_order')

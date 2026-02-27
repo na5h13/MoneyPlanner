@@ -5,6 +5,7 @@ import { getFirestore } from './firebaseAdmin';
 import { syncTransactions } from './plaidService';
 import { decrypt } from '../utils/encryption';
 import { categorizeTransaction, normalizeMerchant } from './categorization';
+import { ensureCategories } from './ensureCategories';
 
 export interface SyncResult {
   synced: number;
@@ -27,13 +28,43 @@ export async function syncUserTransactions(userId: string): Promise<SyncResult> 
     return { synced: 0, errors: ['No linked accounts'] };
   }
 
-  // Get categories for auto-categorization
-  const catSnap = await db.collection('users').doc(userId).collection('categories').get();
-  const categories = catSnap.docs.map(d => ({ id: d.id, ...d.data() })) as Array<{
-    id: string;
-    name: string;
-    includes: string[];
-  }>;
+  // Ensure default categories exist before categorizing
+  const categories = await ensureCategories(userId);
+
+  // Fix orphaned transactions with literal 'uncategorized' string as category_id
+  // This happens when sync runs before categories are seeded
+  const orphanSnap = await db.collection('users').doc(userId).collection('transactions')
+    .where('category_id', '==', 'uncategorized')
+    .get();
+
+  if (!orphanSnap.empty) {
+    console.log(`Fixing ${orphanSnap.size} orphaned transactions with category_id='uncategorized'`);
+    const batch = db.batch();
+    let batchCount = 0;
+
+    for (const txnDoc of orphanSnap.docs) {
+      const txn = txnDoc.data();
+      // Re-categorize each transaction
+      const catResult = await categorizeTransaction(
+        userId,
+        txn.merchant_name || '',
+        txn.name || '',
+        txn.plaid_category || [],
+        categories
+      );
+      batch.update(txnDoc.ref, {
+        category_id: catResult.category_id,
+        category_confidence: catResult.confidence,
+        categorized_by: 'auto',
+        categorized_at: new Date().toISOString(),
+      });
+      batchCount++;
+      // Firestore batch limit is 500
+      if (batchCount >= 499) break;
+    }
+    await batch.commit();
+    console.log(`Fixed ${batchCount} orphaned transactions`);
+  }
 
   for (const [itemId, itemData] of Object.entries(settings.plaid_items as Record<string, any>)) {
     try {

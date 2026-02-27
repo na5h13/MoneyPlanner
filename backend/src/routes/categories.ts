@@ -12,33 +12,7 @@ import { getFirestore } from '../services/firebaseAdmin';
 
 const router = Router();
 
-const DEFAULT_CATEGORIES = [
-  { name: 'Home & Personal', icon: 'home', sort_order: 0, is_default: true, is_income: false, includes: ['rent', 'mortgage', 'utilities', 'electric', 'gas', 'water', 'internet', 'phone', 'insurance', 'gym', 'haircut', 'laundry', 'cleaning'] },
-  { name: 'Food & Transportation', icon: 'food', sort_order: 1, is_default: true, is_income: false, includes: ['grocery', 'restaurant', 'food', 'coffee', 'uber', 'lyft', 'gas station', 'parking', 'transit', 'subway', 'doordash', 'grubhub'] },
-  { name: 'Family', icon: 'family', sort_order: 2, is_default: true, is_income: false, includes: ['school', 'daycare', 'childcare', 'tuition', 'pediatric', 'toys', 'baby', 'kids'] },
-  { name: 'Loans & Debt', icon: 'loan', sort_order: 3, is_default: true, is_income: false, includes: ['loan', 'student', 'credit card', 'payment', 'interest', 'finance', 'debt'] },
-  { name: 'Entertainment & Other', icon: 'entertainment', sort_order: 4, is_default: true, is_income: false, includes: ['netflix', 'spotify', 'hulu', 'amazon', 'subscription', 'movie', 'game', 'music', 'streaming', 'shopping', 'clothing'] },
-  { name: 'Uncategorized', icon: 'uncategorized', sort_order: 5, is_default: true, is_income: false, includes: [] },
-];
-
-// Seed default categories if none exist
-async function ensureCategories(userId: string): Promise<void> {
-  const db = getFirestore();
-  const snap = await db.collection('users').doc(userId).collection('categories').limit(1).get();
-  if (!snap.empty) return;
-
-  const batch = db.batch();
-  for (const cat of DEFAULT_CATEGORIES) {
-    const ref = db.collection('users').doc(userId).collection('categories').doc();
-    batch.set(ref, {
-      ...cat,
-      user_id: userId,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    });
-  }
-  await batch.commit();
-}
+import { ensureCategories } from '../services/ensureCategories';
 
 // GET /api/v1/categories
 router.get('/', async (req: Request, res: Response) => {
