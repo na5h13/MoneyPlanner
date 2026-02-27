@@ -86,9 +86,11 @@ MoneyPlanner/
 │   │   ├── index.ts                  # Express server
 │   │   ├── middleware/auth.ts        # Firebase auth middleware
 │   │   ├── services/
-│   │   │   ├── firebaseAdmin.ts      # Firebase Admin init
+│   │   │   ├── firebaseAdmin.ts      # Firebase Admin init (supports named databases)
 │   │   │   ├── plaidService.ts       # Plaid client wrapper
 │   │   │   ├── categorization.ts     # 4-priority auto-categorization
+│   │   │   ├── ensureCategories.ts   # Shared: seeds default categories if none exist
+│   │   │   ├── syncService.ts        # Plaid cursor-based transaction sync
 │   │   │   └── ../utils/encryption.ts
 │   │   └── routes/
 │   │       ├── transactions.ts       # CRUD + sync + categorize
@@ -159,6 +161,8 @@ MoneyPlanner/
 - Plaid cursor-based sync (iterates has_more loop)
 - AES-256-GCM encryption for Plaid access tokens
 - 4-priority categorization: merchant rule → historical → Plaid map → keyword → Uncategorized
+- `ensureCategories()` shared service — seeds defaults before budget, sync, or category reads
+- Firestore: use `.update()` for dot-notation nested paths, NOT `.set()` (creates flat keys)
 - All routes under `/api/v1/`
 
 ### Data Flow

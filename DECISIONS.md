@@ -180,6 +180,32 @@
 - (-) Complex state machine to implement
 - (-) Users may be frustrated by locked features early on
 
+### ADR-012: Firestore update() for Nested Dot-Notation Paths
+
+**Date:** 2026-02-27
+**Status:** Accepted
+**Context:** Exchange endpoint stored Plaid access tokens in Firestore under `plaid_items.{item_id}`. Using `.set()` with computed dot-notation keys created literal flat field names instead of nested objects.
+**Decision:** Always use `.update()` for dot-notation nested paths (it interprets dots as path separators). Use `.set({}, { merge: true })` first to ensure the document exists.
+**Alternatives Considered:**
+- Nested object structure with `.set({ merge: true })` — works but risky for deep merges (may overwrite siblings)
+- Always use `.update()` — fails on missing docs, need the `.set()` guard
+**Consequences:**
+- (+) Dot-notation works correctly as nested paths
+- (+) Guard `.set()` ensures doc exists for first-time users
+- (-) Two Firestore calls instead of one (negligible perf impact)
+
+### ADR-013: Shared ensureCategories() Service
+
+**Date:** 2026-02-27
+**Status:** Accepted
+**Context:** Categories were only seeded on `GET /categories`. Budget and sync read categories directly, leading to empty categories and misassigned transactions.
+**Decision:** Extract `ensureCategories()` as a shared service. Call from all endpoints that read categories: categories route, budget route, sync service.
+**Consequences:**
+- (+) Categories always exist before being read
+- (+) Single source of truth for default category definitions
+- (+) Re-categorizes orphaned transactions on sync
+- (-) Extra Firestore read on every call (mitigated by early-return if categories exist)
+
 ---
 
 ## Rejected Approaches

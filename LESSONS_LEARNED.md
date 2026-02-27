@@ -150,6 +150,38 @@
 **Solution:** Use GitHub Actions CI for all Android builds. Never attempt local builds on aarch64.
 **Rule:** If `uname -m` returns aarch64, don't try local Android builds. Use CI exclusively.
 
+### 2026-02-27 — Firestore set() with Dot-Notation Creates Flat Keys
+
+**Context:** Exchange endpoint stored Plaid items using `.set({ [`plaid_items.${itemId}`]: {...} }, { merge: true })`.
+**Problem:** Accounts endpoint found zero plaid_items. Data existed but as a flat key `"plaid_items.KkMx0bad..."` not a nested `plaid_items` object.
+**Root Cause:** Firestore `.set()` treats JavaScript computed property keys as **literal field names**. Only `.update()` interprets dot-notation as nested field paths.
+**Solution:** Changed to `.update()` (which interprets dots as paths). Use `.set({}, { merge: true })` first to ensure doc exists.
+**Rule:** NEVER use `.set()` with dot-notation computed keys for nested fields. Use `.update()` or nested object structure.
+
+### 2026-02-27 — Firestore Named Database Needs Modular Import
+
+**Context:** Added `FIRESTORE_DATABASE_ID` env var support for named Firestore databases.
+**Problem:** `admin.app().firestore(dbName)` — TypeScript error, `firestore()` accepts 0 arguments.
+**Root Cause:** Firebase Admin v12 requires the modular import `getFirestore(app, databaseId)` from `firebase-admin/firestore` for named databases.
+**Solution:** `import { getFirestore as getFirestoreDb } from 'firebase-admin/firestore'` and call `getFirestoreDb(admin.app(), dbName)`.
+**Rule:** For named Firestore databases in firebase-admin v12+, use the modular `getFirestore()` import, not the namespaced `admin.app().firestore()`.
+
+### 2026-02-27 — Firestore Composite Index Required for Multi-Field Queries
+
+**Context:** Transaction sync calls categorization which queries `where('display_merchant') + where('categorized_by') + orderBy('categorized_at')`.
+**Problem:** Sync failed with `9 FAILED_PRECONDITION: The query requires an index`.
+**Root Cause:** Firestore requires composite indexes for queries with multiple where/orderBy on different fields.
+**Solution:** Wrapped the historical categorization query in try/catch — falls through to lower priority levels gracefully. User should also create the index via Firebase Console link.
+**Rule:** Any Firestore query with multiple where + orderBy needs a composite index. Always wrap in try/catch with graceful fallback.
+
+### 2026-02-27 — Categories Must Be Seeded Before Sync and Budget
+
+**Context:** Budget screen showed zero despite 133 synced transactions.
+**Problem:** Budget endpoint reads categories → finds none → returns empty display. Sync categorized all transactions with fallback `'uncategorized'` string instead of real category IDs.
+**Root Cause:** Only `GET /categories` called `ensureCategories()`. Budget and sync endpoints read categories directly without seeding.
+**Solution:** Extracted `ensureCategories()` as shared service. Called from categories route, budget route, and sync service. Added orphan repair to re-categorize transactions with literal `'uncategorized'` string.
+**Rule:** Any endpoint that reads categories must call `ensureCategories()` first. Extract shared initialization logic as reusable services.
+
 ---
 
 ## Quick Reference — Common Gotchas
@@ -177,6 +209,10 @@
 | Plaid SDK: institution.id not institution_id | Mobile SDK uses `.id`, some web examples use `.institution_id` |
 | Merchant regex overrides | Catches edge cases Plaid miscategorizes (from budgeting-app) |
 | Rolling average must exclude current event | When comparing new value vs historical average, exclude the new value |
+| Firestore `.set()` with dot-notation | Creates FLAT keys, not nested paths. Use `.update()` for nested fields |
+| Firestore composite index needed | Multi-field where+orderBy queries fail without index. Wrap in try/catch |
+| Categories must be seeded before use | Budget + sync must call `ensureCategories()` — not just GET /categories |
+| Named Firestore database | Use `getFirestore(app, dbName)` from `firebase-admin/firestore`, not `admin.app().firestore(dbName)` |
 
 ---
 
@@ -196,3 +232,5 @@
 | DEV_MODE env var | Bypasses auth + phase gates for fast development iteration |
 | ImageMagick for placeholder assets | Valid PNGs in one command |
 | Individual echo for .env | Clean values, no whitespace issues |
+| Temporary debug endpoints | `/debug/*` no-auth endpoints for tracing pipeline failures — remove after fixing |
+| `ensureCategories()` shared service | Prevents empty-category bugs across budget, sync, and categories routes |
