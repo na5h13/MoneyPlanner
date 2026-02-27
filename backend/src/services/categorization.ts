@@ -94,20 +94,31 @@ export async function categorizeTransaction(
   }
 
   // Priority 2: Historical pattern (same merchant categorized by user before)
-  const histSnap = await db
-    .collection('users')
-    .doc(userId)
-    .collection('transactions')
-    .where('display_merchant', '==', normalizedMerchant)
-    .where('categorized_by', '==', 'user')
-    .orderBy('categorized_at', 'desc')
-    .limit(1)
-    .get();
+  // This query needs a composite index (categorized_by + display_merchant + categorized_at).
+  // If index doesn't exist yet, skip gracefully and fall through to lower priorities.
+  try {
+    const histSnap = await db
+      .collection('users')
+      .doc(userId)
+      .collection('transactions')
+      .where('display_merchant', '==', normalizedMerchant)
+      .where('categorized_by', '==', 'user')
+      .orderBy('categorized_at', 'desc')
+      .limit(1)
+      .get();
 
-  if (!histSnap.empty) {
-    const prevTxn = histSnap.docs[0].data();
-    if (prevTxn.category_id) {
-      return { category_id: prevTxn.category_id, confidence: 0.95, source: 'historical' };
+    if (!histSnap.empty) {
+      const prevTxn = histSnap.docs[0].data();
+      if (prevTxn.category_id) {
+        return { category_id: prevTxn.category_id, confidence: 0.95, source: 'historical' };
+      }
+    }
+  } catch (err: any) {
+    // FAILED_PRECONDITION = missing composite index — skip historical matching
+    if (err?.code === 9 || err?.message?.includes('index')) {
+      console.warn('Historical categorization skipped — composite index not yet created');
+    } else {
+      throw err;
     }
   }
 
