@@ -5,7 +5,7 @@ import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
-import { initFirebase } from './services/firebaseAdmin';
+import { initFirebase, getFirestore } from './services/firebaseAdmin';
 import { authMiddleware } from './middleware/auth';
 
 import transactionRoutes from './routes/transactions';
@@ -32,18 +32,26 @@ app.use(cors({
 }));
 app.use(express.json());
 
-// Health check (no auth)
-app.get('/health', (_req, res) => {
+// Health check (no auth) — includes Firestore connectivity test
+app.get('/health', async (_req, res) => {
+  let firestoreStatus = 'unknown';
+  try {
+    const db = getFirestore();
+    await db.collection('_health').doc('ping').set({ ts: new Date().toISOString() });
+    firestoreStatus = 'ok';
+  } catch (err: any) {
+    firestoreStatus = `error: ${err?.message || 'unknown'}`;
+  }
+
   res.json({
     status: 'ok',
     timestamp: new Date().toISOString(),
+    firestore: firestoreStatus,
+    has_firebase_key: !!process.env.FIREBASE_SERVICE_ACCOUNT_KEY_BASE64,
     plaid_env: process.env.PLAID_ENV || 'not set',
     has_plaid_client_id: !!process.env.PLAID_CLIENT_ID,
     has_plaid_secret: !!process.env.PLAID_SECRET,
     has_encryption_key: !!process.env.ENCRYPTION_KEY,
-    dev_mode: process.env.DEV_MODE === 'true',
-    redirect_uri: process.env.PLAID_REDIRECT_URI || '(not set)',
-    android_package_name: process.env.PLAID_ANDROID_PACKAGE_NAME || '(not set)',
   });
 });
 
