@@ -206,6 +206,89 @@
 - (+) Re-categorizes orphaned transactions on sync
 - (-) Extra Firestore read on every call (mitigated by early-return if categories exist)
 
+### ADR-014: Standalone Vite+React Web App (Not Expo Web)
+
+**Date:** 2026-02-27
+**Status:** Accepted
+**Context:** Need a web version of the budget tracker. Mobile app uses RN-only deps: expo-blur, react-native-plaid-link-sdk, @react-native-firebase/auth, react-native-svg. These either don't work on web or require complex polyfills via Expo Web.
+**Decision:** Create a standalone `web/` directory with Vite 6 + React 19 + TypeScript. Pure CSS glassmorphism, Firebase JS SDK, standard HTML/SVG. Share types, store patterns, and design tokens with mobile — not code directly.
+**Alternatives Considered:**
+- Expo Web (`expo start --web`) — would need polyfills for expo-blur (heavy), Plaid SDK (impossible), RN Firebase (different API). More fights than solutions.
+- Next.js — SSR unnecessary for a dashboard SPA, adds server complexity
+- Remix — same SSR overhead, backend already exists as Express
+**Consequences:**
+- (+) Zero compatibility fights with RN-native packages
+- (+) Pure CSS glassmorphism is smaller and faster than expo-blur
+- (+) Firebase JS SDK is the canonical web SDK — no polyfill needed
+- (+) Vite dev server is instant (<1s hot reload)
+- (-) Code duplication for types, store patterns, format utilities (mitigated by copying, not sharing via monorepo)
+- (-) Two separate `npm install` roots (mobile + web)
+
+### ADR-015: Desktop Sidebar Layout with Mobile Responsive Breakpoint
+
+**Date:** 2026-02-27
+**Status:** Accepted
+**Context:** Initial web layout used a 430px phone column with bottom tab bar — direct copy of mobile mockups. User feedback: "designed for mobile not desktop, bad design."
+**Decision:** Desktop-first layout with 220px fixed sidebar navigation. Content area has `max-width: 800px` with 32px padding. At <768px viewport, sidebar hides and a mobile bottom nav appears (same as phone layout). CSS media query handles the switch — no JavaScript.
+**Alternatives Considered:**
+- Phone-width column centered on desktop — wastes 80% of screen space
+- Top horizontal navbar — loses vertical space, doesn't match the brand aesthetic
+- Collapsible sidebar — over-engineering for 3 navigation items
+**Consequences:**
+- (+) Full desktop utilization — content stretches appropriately
+- (+) Sidebar always visible on desktop — no hamburger menu needed
+- (+) Mobile users still get the familiar bottom tab bar
+- (-) CSS is more complex (two layout modes)
+
+### ADR-016: Lazy Firebase Initialization for Web
+
+**Date:** 2026-02-27
+**Status:** Accepted
+**Context:** Firebase `initializeApp()` was called at module import time in `auth.ts`. When any VITE_FIREBASE_* env var was missing, it threw synchronously before React rendered → blank white screen with no error feedback.
+**Decision:** Firebase is initialized lazily via `getFirebaseAuth()` function — only runs when auth is actually needed. App.tsx in DEV_MODE never calls auth functions, so Firebase never initializes (no crash). In production, first auth attempt triggers init.
+**Alternatives Considered:**
+- Try/catch around module-level `initializeApp()` — still runs before React, error can't be shown in UI
+- Check env vars in index.html before loading app — fragile, can't use React error boundaries
+- Always require valid Firebase config — breaks local development without Firebase
+**Consequences:**
+- (+) DEV_MODE works without any Firebase config
+- (+) Missing config shows a proper error in the UI (after React mounts)
+- (+) No blank screen crash
+- (-) First auth call has slight delay (one-time init)
+
+### ADR-017: Error State Surfacing on All Pages
+
+**Date:** 2026-02-27
+**Status:** Accepted
+**Context:** Initial implementation caught all API errors silently (console.log). All 3 screens showed empty states identically whether data was loading, genuinely empty, or failing. User saw "No transactions" and had no way to know the API was returning 401.
+**Decision:** Zustand store has explicit error states per slice: `budgetError`, `transactionsError`, `categoriesError`, `accountsError`, `connectionError`. Every page renders `ErrorBanner` (amber, with retry button) when its error state is set. Sidebar shows a connection status dot (green/amber/spinning).
+**Alternatives Considered:**
+- Global error toast — loses context of which page/section failed
+- Console-only logging — invisible to users, already proven insufficient
+- Error boundary for crashes — doesn't catch fetch failures (they're caught in store)
+**Consequences:**
+- (+) Users always know when something is wrong
+- (+) Retry is one click — no page refresh needed
+- (+) Connection dot gives ambient API health feedback
+- (-) More state to manage in the store
+
+### ADR-018: Firebase Web App Config Separate from Android
+
+**Date:** 2026-02-27
+**Status:** Accepted
+**Context:** Firebase project has multiple registered apps (Android + Web). Each has a different API key and app ID. `google-services.json` has the Android key. The web app needs the web-specific config from Firebase Console.
+**Decision:** Web config is stored in `web/.env` with `VITE_*` prefix. Values come from Firebase Console → Project Settings → Web App (NOT from google-services.json). The `.env.example` documents all required vars. Root `.env` contains the same values under `EXPO_PUBLIC_FIREBASE_*` prefix.
+**Config mapping:**
+| Value | Android source | Web source |
+|-------|---------------|------------|
+| API Key | `google-services.json` → `api_key.current_key` | Firebase Console → Web App config |
+| App ID | `google-services.json` → `mobilesdk_app_id` | Firebase Console → Web App config |
+| Auth Domain | N/A (handled by RN Firebase) | `{project-id}.firebaseapp.com` |
+**Consequences:**
+- (+) Clear separation between platform configs
+- (+) .env.example prevents guessing which values to use
+- (-) Must register web app in Firebase Console before web auth works
+
 ---
 
 ## Rejected Approaches
@@ -220,3 +303,8 @@
 | Mock/fake data | Masks real integration issues, delays debugging | 2026-02-24 |
 | Engagement metrics as OKRs | Proven not to correlate with behavior change (Irrational Labs) | 2026-02-24 |
 | Float for amounts | Floating-point precision errors in financial calculations | 2026-02-24 |
+| Expo Web for web SPA | RN-only deps (expo-blur, Plaid SDK, RN Firebase) need polyfills or don't work | 2026-02-27 |
+| Module-level Firebase init (web) | Crashes before React renders if env vars missing → blank screen | 2026-02-27 |
+| Phone-width column for web layout | Wastes 80% of desktop screen, bad UX, user explicitly rejected | 2026-02-27 |
+| Silent API error handling | Users can't distinguish empty data from broken API → appears broken | 2026-02-27 |
+| Android Firebase API key for web | Different key per platform — web key from Firebase Console, not google-services.json | 2026-02-27 |

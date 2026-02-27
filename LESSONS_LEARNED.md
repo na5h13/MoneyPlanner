@@ -182,6 +182,65 @@
 **Solution:** Extracted `ensureCategories()` as shared service. Called from categories route, budget route, and sync service. Added orphan repair to re-categorize transactions with literal `'uncategorized'` string.
 **Rule:** Any endpoint that reads categories must call `ensureCategories()` first. Extract shared initialization logic as reusable services.
 
+### 2026-02-27 — Firebase JS Init at Module Load Causes Blank Screen on Web
+
+**Context:** Building web SPA with Firebase JS Auth. `initializeApp()` called at top of `auth.ts` module.
+**Problem:** App rendered a completely blank white screen with no errors in the UI.
+**Root Cause:** Firebase `initializeApp()` executes at module import time. If any VITE_FIREBASE_* env vars are missing or empty, Firebase throws synchronously — BEFORE React even mounts. No error boundary can catch it because React hasn't rendered yet.
+**Solution:** Lazy initialization pattern — wrap Firebase init in a `getFirebaseAuth()` function that only initializes on first call. App.tsx checks DEV_MODE and only calls auth functions when needed.
+```typescript
+let auth: Auth | null = null;
+function getFirebaseAuth(): Auth {
+  if (auth) return auth;
+  const config = { apiKey: import.meta.env.VITE_FIREBASE_API_KEY, ... };
+  if (!config.apiKey) throw new Error('Firebase config missing');
+  app = initializeApp(config);
+  auth = getAuth(app);
+  return auth;
+}
+```
+**Rule:** NEVER call `initializeApp()` at module scope in web apps. Always use lazy init behind a function. Check env vars before calling.
+
+### 2026-02-27 — Firebase Web vs Android API Keys Are Different
+
+**Context:** Setting up Firebase auth for the web SPA. Used the API key from `google-services.json`.
+**Problem:** Firebase auth calls failed silently. Google Sign-In didn't work.
+**Root Cause:** `google-services.json` contains the **Android** API key (`AIzaSyC8bJ9MLwaSD0pSjvprnX4z65z_Y9idmPU`). The **web** app needs a different API key (`AIzaSyDxBuR6u9BB77C2fWHADBA6KC7CtvPoMIg`) from Firebase Console → Project Settings → Web App. Each platform (iOS, Android, Web) has its own registered app with its own API key and app ID.
+**Solution:** Found the correct web config in the root `.env` file under `EXPO_PUBLIC_FIREBASE_*` vars (which were actually the web config, not Android). Copied to `web/.env` as `VITE_FIREBASE_*` vars.
+**Rule:** Firebase API keys are per-platform. Android key comes from google-services.json, Web key comes from Firebase Console → Web App config. NEVER use google-services.json values for web Firebase.
+
+### 2026-02-27 — Web App Must Be Desktop-First (Not Mobile Phone Width)
+
+**Context:** Built web SPA with 430px fixed-width phone column layout and bottom tab bar.
+**Problem:** User feedback: "its designed for mobile not desktop with nav buttons at the bottom, bad design...i cant do anything on the app, you are prioritizing task completion over task compliance, very bad"
+**Root Cause:** Copied mobile phone mockup layout from `visual-reference.html` literally — 430px column, bottom tabs. Web users expect desktop-first layouts with sidebar navigation. The visual reference was for phone screens, NOT for web.
+**Solution:** Complete rewrite: 220px sidebar navigation on desktop, responsive breakpoint at 768px switches to mobile bottom nav. Content area uses `max-width: 800px` with `padding: 32px 40px`. Typography scaled up for desktop (22px screen names, 32px hero text).
+**Rule:** When building a web app from a mobile design, ALWAYS adapt to desktop-first. Sidebar nav for desktop, bottom tabs for mobile via media query. Never use fixed phone-width columns.
+
+### 2026-02-27 — Silent API Errors Make Web App Appear Broken
+
+**Context:** Web app showed all 3 screens with empty states — "No transactions", "No budget data", "No linked accounts".
+**Problem:** User saw empty screens and assumed the app was broken. No indication that API calls were failing.
+**Root Cause:** All API fetch calls caught errors silently (console.log only). The UI showed empty states identically to "data loaded but genuinely empty" states. Railway backend returned 401 (Firebase auth required) but the UI gave no feedback.
+**Solution:** Added error state to every store slice (`budgetError`, `transactionsError`, `categoriesError`, `accountsError`, `connectionError`). Every page renders `ErrorBanner` with retry button when errors occur. Sidebar shows connection status dot (green/amber/spinning).
+**Rule:** NEVER silently swallow API errors in web apps. Every fetch must surface failures to the UI. Differentiate between "loading", "empty but ok", and "error" states. Add retry mechanisms. Show connection status.
+
+### 2026-02-27 — Vite Env Vars Need VITE_ Prefix
+
+**Context:** Setting up environment variables for the web app.
+**Problem:** `import.meta.env.API_BASE_URL` was undefined at runtime.
+**Root Cause:** Vite only exposes env vars prefixed with `VITE_` to client-side code (security measure — prevents accidental exposure of server-side secrets).
+**Solution:** All web env vars use `VITE_` prefix: `VITE_API_BASE_URL`, `VITE_FIREBASE_API_KEY`, etc.
+**Rule:** Vite requires `VITE_` prefix. Expo requires `EXPO_PUBLIC_` prefix. Both are security measures. Never expect unprefixed env vars to work in client code.
+
+### 2026-02-27 — Standalone Vite App vs Expo Web for RN Projects
+
+**Context:** Needed a web version of the Expo React Native budget tracker app.
+**Problem:** Mobile app uses heavy RN-only dependencies: expo-blur, react-native-plaid-link-sdk, @react-native-firebase/auth, react-native-svg.
+**Root Cause:** Expo Web transpiles RN components but RN-only native modules (Plaid SDK, expo-blur, RN Firebase) either don't work or need complex polyfills. Building web via Expo would mean fighting compatibility issues.
+**Solution:** Created standalone `web/` directory with its own Vite + React setup. Pure CSS glassmorphism replaces expo-blur. Firebase JS SDK replaces RN Firebase. Standard HTML/CSS replaces react-native-svg. Shared: TypeScript types, Zustand store patterns, API endpoint structure, design tokens.
+**Rule:** When adding web to an RN project with native-only deps, create a standalone Vite app. Don't fight Expo Web compatibility. Share types, store patterns, and design tokens — not code directly.
+
 ---
 
 ## Quick Reference — Common Gotchas
@@ -213,6 +272,13 @@
 | Firestore composite index needed | Multi-field where+orderBy queries fail without index. Wrap in try/catch |
 | Categories must be seeded before use | Budget + sync must call `ensureCategories()` — not just GET /categories |
 | Named Firestore database | Use `getFirestore(app, dbName)` from `firebase-admin/firestore`, not `admin.app().firestore(dbName)` |
+| Firebase JS init at module load → blank screen | Use lazy init pattern: `getFirebaseAuth()` function, NOT top-level `initializeApp()` |
+| Firebase web vs Android API key | Different keys per platform. Web key from Firebase Console, NOT from google-services.json |
+| Web layout mobile-first → bad UX | Desktop sidebar (220px) + mobile bottom nav (<768px breakpoint). Never fixed phone-width |
+| Silent API errors → "empty" screens | Surface all errors with ErrorBanner + retry. Differentiate empty/loading/error states |
+| Vite env vars need VITE_ prefix | `import.meta.env.VITE_*` — unprefixed vars are NOT exposed to client code |
+| Expo Web with RN-native deps | Use standalone Vite app. Don't fight expo-blur/Plaid/RN Firebase compatibility |
+| Web Firebase config location | Root `.env` has EXPO_PUBLIC_FIREBASE_* values — these ARE the web config. Copy to web/.env as VITE_* |
 
 ---
 
@@ -234,3 +300,10 @@
 | Individual echo for .env | Clean values, no whitespace issues |
 | Temporary debug endpoints | `/debug/*` no-auth endpoints for tracing pipeline failures — remove after fixing |
 | `ensureCategories()` shared service | Prevents empty-category bugs across budget, sync, and categories routes |
+| Lazy Firebase init (web) | Prevents blank screen crash from missing env vars; init only when auth is needed |
+| Desktop sidebar + mobile bottom nav | Single responsive layout covers both desktop and mobile; CSS media query at 768px |
+| ErrorBanner with retry on every page | Users always know when something is wrong and can self-recover |
+| Connection status dot in sidebar | Quick visual indicator of API health without checking each page |
+| Standalone Vite app for web | Clean separation from RN-native deps; share only types + patterns |
+| CSS custom properties for design tokens | All colors, fonts, glass effects in one `theme.css` — easy to sync with mobile theme |
+| .env.example in web/ | Documents all required config vars with placeholder values; prevents guessing |
