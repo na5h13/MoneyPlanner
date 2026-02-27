@@ -59,6 +59,10 @@ export function initFirebase(): void {
 
 export function getFirestore(): admin.firestore.Firestore {
   if (!initialized) initFirebase();
+  const dbName = process.env.FIRESTORE_DATABASE_ID;
+  if (dbName) {
+    return admin.app().firestore(dbName);
+  }
   return admin.firestore();
 }
 

@@ -47,6 +47,7 @@ app.get('/health', async (_req, res) => {
     status: 'ok',
     timestamp: new Date().toISOString(),
     firestore: firestoreStatus,
+    firestore_db: process.env.FIRESTORE_DATABASE_ID || '(default)',
     has_firebase_key: !!process.env.FIREBASE_SERVICE_ACCOUNT_KEY_BASE64,
     plaid_env: process.env.PLAID_ENV || 'not set',
     has_plaid_client_id: !!process.env.PLAID_CLIENT_ID,
