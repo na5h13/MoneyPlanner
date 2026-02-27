@@ -104,6 +104,24 @@ app.post('/debug/migrate', async (_req, res) => {
   }
 });
 
+// TEMPORARY: Trigger sync for a user and return detailed results
+app.post('/debug/sync/:userId', async (req, res) => {
+  try {
+    const { syncUserTransactions } = require('./services/syncService');
+    const userId = (req.params as any).userId;
+    console.log('DEBUG sync for user:', userId);
+    const result = await syncUserTransactions(userId);
+    res.json({ userId, result });
+  } catch (err: any) {
+    res.status(500).json({
+      error: err?.message,
+      code: err?.response?.data?.error_code,
+      plaidError: err?.response?.data,
+      stack: err?.stack?.split('\n').slice(0, 5),
+    });
+  }
+});
+
 // TEMPORARY DEBUG — traces accounts pipeline step by step (remove after fixing)
 app.get('/debug/accounts', async (_req, res) => {
   const steps: any[] = [];
