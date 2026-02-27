@@ -1,20 +1,77 @@
-// Budget Page — SummaryBar + CategoryCards with line items
-import { useEffect, useState } from 'react';
+// Budget Page — Hierarchical drill-down: GroupCard → CategoryCard → LineItems
+// Groups start collapsed. Categories inside groups start collapsed.
+// Tap group → see categories. Tap category → see line items.
+import { useEffect, useState, useMemo } from 'react';
 import { useStore } from '../store';
 import { GlassCard } from '../components/GlassCard';
 import { MonthNavigator } from '../components/MonthNavigator';
 import { ErrorBanner } from '../components/ErrorBanner';
 import { formatAmountUnsigned, formatAmountSigned } from '../api';
-import type { BudgetCategoryDisplay, BudgetLineItem } from '../types';
+import type { BudgetCategoryDisplay, BudgetLineItem, CategoryGroup } from '../types';
+
+const GROUP_ORDER: CategoryGroup[] = ['Essentials', 'Daily Living', 'Family & Home', 'Leisure', 'Financial'];
+
+interface GroupData {
+  group: CategoryGroup;
+  categories: BudgetCategoryDisplay[];
+  totalSpent: number;
+  totalTarget: number;
+}
+
+function groupBudgetData(budgetDisplay: BudgetCategoryDisplay[]): { groups: GroupData[]; uncategorized: BudgetCategoryDisplay | null } {
+  const grouped = new Map<CategoryGroup, BudgetCategoryDisplay[]>();
+  let uncategorized: BudgetCategoryDisplay | null = null;
+
+  for (const cat of budgetDisplay) {
+    if (cat.category.is_income) continue;
+
+    const group = (cat.category as any).group as CategoryGroup | undefined;
+
+    if (!group || group === 'Uncategorized') {
+      if (cat.category.name === 'Uncategorized') uncategorized = cat;
+      else {
+        // Fallback for categories without group field
+        const fallback: CategoryGroup = 'Daily Living';
+        if (!grouped.has(fallback)) grouped.set(fallback, []);
+        grouped.get(fallback)!.push(cat);
+      }
+      continue;
+    }
+
+    if (!grouped.has(group)) grouped.set(group, []);
+    grouped.get(group)!.push(cat);
+  }
+
+  const groups: GroupData[] = [];
+  for (const groupName of GROUP_ORDER) {
+    const cats = grouped.get(groupName) || [];
+    if (cats.length === 0) continue;
+    groups.push({
+      group: groupName,
+      categories: cats,
+      totalSpent: cats.reduce((sum, c) => sum + c.spent, 0),
+      totalTarget: cats.reduce((sum, c) => sum + (c.target?.target_amount ?? 0), 0),
+    });
+  }
+
+  return { groups, uncategorized };
+}
 
 export function Budget() {
   const {
     budgetDisplay, budgetSummary, budgetLoading, budgetError, budgetPeriod,
-    collapsedCategories, fetchBudget, navigateBudgetPeriod,
-    toggleCategoryCollapse, createLineItem,
+    collapsedGroups, expandedCategories,
+    fetchBudget, navigateBudgetPeriod,
+    toggleGroupCollapse, toggleCategoryExpand, createLineItem,
   } = useStore();
 
-  useEffect(() => { fetchBudget(); }, []);
+  // Fetch budget for the current period on mount
+  useEffect(() => { fetchBudget(budgetPeriod); }, []);
+
+  const { groups, uncategorized } = useMemo(
+    () => groupBudgetData(budgetDisplay),
+    [budgetDisplay],
+  );
 
   return (
     <div className="screen">
@@ -27,7 +84,7 @@ export function Budget() {
       />
 
       {budgetError && (
-        <ErrorBanner message={budgetError} onRetry={() => fetchBudget()} />
+        <ErrorBanner message={budgetError} onRetry={() => fetchBudget(budgetPeriod)} />
       )}
 
       {budgetLoading && budgetDisplay.length === 0 && !budgetError ? (
@@ -35,16 +92,29 @@ export function Budget() {
       ) : (
         <>
           {budgetSummary && <SummaryBar summary={budgetSummary} />}
-          {budgetDisplay.map((cat) => (
-            <CategoryCard
-              key={cat.category.id}
-              display={cat}
-              collapsed={collapsedCategories.has(cat.category.id)}
-              onToggle={() => toggleCategoryCollapse(cat.category.id)}
-              onAddItem={(name) => createLineItem(cat.category.id, name)}
+
+          {groups.map((g) => (
+            <GroupCard
+              key={g.group}
+              data={g}
+              collapsed={collapsedGroups.has(g.group)}
+              expandedCategories={expandedCategories}
+              onToggleGroup={() => toggleGroupCollapse(g.group)}
+              onToggleCategory={(id) => toggleCategoryExpand(id)}
+              onAddItem={(catId, name) => createLineItem(catId, name)}
             />
           ))}
-          {budgetDisplay.length === 0 && !budgetLoading && !budgetError && (
+
+          {uncategorized && uncategorized.spent > 0 && (
+            <CategoryCard
+              display={uncategorized}
+              collapsed={!expandedCategories.has(uncategorized.category.id)}
+              onToggle={() => toggleCategoryExpand(uncategorized!.category.id)}
+              onAddItem={(name) => createLineItem(uncategorized!.category.id, name)}
+            />
+          )}
+
+          {groups.length === 0 && !budgetLoading && !budgetError && (
             <div className="empty-state">No budget data for this period</div>
           )}
         </>
@@ -52,6 +122,8 @@ export function Budget() {
     </div>
   );
 }
+
+/* ── SummaryBar ── */
 
 function SummaryBar({ summary }: { summary: { income: number; committed: number; one_time: number; safe_to_spend: number } }) {
   const isPositive = summary.safe_to_spend >= 0;
@@ -85,52 +157,64 @@ function SummaryItem({ label, value, color }: { label: string; value: number; co
   );
 }
 
-function CategoryCard({
-  display,
+/* ── GroupCard ── */
+
+function GroupCard({
+  data,
   collapsed,
-  onToggle,
+  expandedCategories,
+  onToggleGroup,
+  onToggleCategory,
   onAddItem,
 }: {
-  display: BudgetCategoryDisplay;
+  data: GroupData;
   collapsed: boolean;
-  onToggle: () => void;
-  onAddItem: (name: string) => void;
+  expandedCategories: Set<string>;
+  onToggleGroup: () => void;
+  onToggleCategory: (id: string) => void;
+  onAddItem: (categoryId: string, name: string) => void;
 }) {
-  const { category, target, line_items, spent } = display;
-  const targetAmount = target?.target_amount ?? 0;
-  const isOver = targetAmount > 0 && spent > targetAmount;
-  const pct = targetAmount > 0 ? Math.min((spent / targetAmount) * 100, 100) : 0;
+  const { group, categories, totalSpent, totalTarget } = data;
+  const isOver = totalTarget > 0 && totalSpent > totalTarget;
+  const pct = totalTarget > 0 ? Math.min((totalSpent / totalTarget) * 100, 100) : 0;
+  const hasTarget = totalTarget > 0;
 
   return (
     <GlassCard glow={isOver ? 'warning' : undefined} style={{ padding: '14px 16px' }}>
-      {/* Header */}
+      {/* Group header */}
       <div
-        onClick={onToggle}
+        onClick={onToggleGroup}
         style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <span style={{ fontSize: 15, fontWeight: 600 }}>{category.name}</span>
-          <span style={{ fontSize: 10, color: 'var(--neutral)', transition: 'transform 0.2s' }}>
-            {collapsed ? '\u25B8' : '\u25BE'}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={{
+            fontSize: 11,
+            color: 'var(--neutral)',
+            transition: 'transform 0.2s',
+            display: 'inline-block',
+            transform: collapsed ? 'rotate(0deg)' : 'rotate(90deg)',
+          }}>
+            {'\u25B8'}
           </span>
+          <span style={{ fontSize: 16, fontWeight: 700, fontFamily: 'var(--font-display)' }}>{group}</span>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
           <span className="data-text" style={{ fontSize: 14, color: isOver ? 'var(--warning)' : undefined }}>
-            {formatAmountUnsigned(spent)}
+            {formatAmountUnsigned(totalSpent)}
           </span>
-          {targetAmount > 0 && (
+          {hasTarget && (
             <span className="data-text" style={{ fontSize: 12, color: 'var(--neutral)' }}>
-              /{formatAmountUnsigned(targetAmount)}
+              /{formatAmountUnsigned(totalTarget)}
             </span>
           )}
           {isOver && <span style={{ fontSize: 10, color: 'var(--warning)', marginLeft: 2 }}>&#9650;</span>}
         </div>
       </div>
 
-      {/* Progress */}
-      {targetAmount > 0 && (
-        <div className="progress-container">
-          <div className="progress-bg">
+      {/* Progress bar — always visible as track, filled if targets exist */}
+      <div className="progress-container">
+        <div className="progress-bg">
+          {hasTarget && (
             <div
               className="progress-fill"
               style={{
@@ -138,12 +222,99 @@ function CategoryCard({
                 background: isOver ? 'var(--warning)' : 'var(--deep-sage)',
               }}
             />
-            <div className="progress-marker" />
-          </div>
+          )}
+        </div>
+      </div>
+
+      {/* Expanded: show category cards */}
+      {!collapsed && (
+        <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {categories.map((cat) => (
+            <CategoryCard
+              key={cat.category.id}
+              display={cat}
+              collapsed={!expandedCategories.has(cat.category.id)}
+              onToggle={() => onToggleCategory(cat.category.id)}
+              onAddItem={(name) => onAddItem(cat.category.id, name)}
+              nested
+            />
+          ))}
         </div>
       )}
+    </GlassCard>
+  );
+}
 
-      {/* Line items */}
+/* ── CategoryCard ── */
+
+function CategoryCard({
+  display,
+  collapsed,
+  onToggle,
+  onAddItem,
+  nested = false,
+}: {
+  display: BudgetCategoryDisplay;
+  collapsed: boolean;
+  onToggle: () => void;
+  onAddItem: (name: string) => void;
+  nested?: boolean;
+}) {
+  const { category, target, line_items, spent } = display;
+  const targetAmount = target?.target_amount ?? 0;
+  const isOver = targetAmount > 0 && spent > targetAmount;
+  const pct = targetAmount > 0 ? Math.min((spent / targetAmount) * 100, 100) : 0;
+  const hasTarget = targetAmount > 0;
+
+  const card = (
+    <>
+      {/* Header */}
+      <div
+        onClick={onToggle}
+        style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <span style={{
+            fontSize: 10,
+            color: 'var(--neutral)',
+            transition: 'transform 0.2s',
+            display: 'inline-block',
+            transform: collapsed ? 'rotate(0deg)' : 'rotate(90deg)',
+          }}>
+            {'\u25B8'}
+          </span>
+          <span style={{ fontSize: 14, fontWeight: 600 }}>{category.name}</span>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+          <span className="data-text" style={{ fontSize: 13, color: isOver ? 'var(--warning)' : undefined }}>
+            {formatAmountUnsigned(spent)}
+          </span>
+          {hasTarget && (
+            <span className="data-text" style={{ fontSize: 11, color: 'var(--neutral)' }}>
+              /{formatAmountUnsigned(targetAmount)}
+            </span>
+          )}
+          {isOver && <span style={{ fontSize: 10, color: 'var(--warning)', marginLeft: 2 }}>&#9650;</span>}
+        </div>
+      </div>
+
+      {/* Progress bar — always visible as track */}
+      <div style={{ marginTop: 4 }}>
+        <div className="progress-bg" style={{ height: 3 }}>
+          {hasTarget && (
+            <div
+              className="progress-fill"
+              style={{
+                width: `${pct}%`,
+                height: 3,
+                background: isOver ? 'var(--warning)' : 'var(--deep-sage)',
+              }}
+            />
+          )}
+        </div>
+      </div>
+
+      {/* Line items — only when expanded */}
       {!collapsed && line_items.length > 0 && (
         <>
           <ColumnHeaders />
@@ -157,9 +328,25 @@ function CategoryCard({
       {!collapsed && line_items.length === 0 && (
         <AddItemButton onAdd={onAddItem} />
       )}
+    </>
+  );
+
+  if (nested) {
+    return (
+      <GlassCard tier="inset" glow={isOver ? 'warning' : undefined} style={{ padding: '10px 12px' }}>
+        {card}
+      </GlassCard>
+    );
+  }
+
+  return (
+    <GlassCard glow={isOver ? 'warning' : undefined} style={{ padding: '14px 16px' }}>
+      {card}
     </GlassCard>
   );
 }
+
+/* ── Line Item Components ── */
 
 function ColumnHeaders() {
   const headerStyle: React.CSSProperties = {
@@ -288,6 +475,8 @@ function AddItemButton({ onAdd }: { onAdd: (name: string) => void }) {
     </div>
   );
 }
+
+/* ── Helpers ── */
 
 function classificationBadge(type?: string): string | null {
   switch (type) {

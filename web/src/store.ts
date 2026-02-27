@@ -42,7 +42,8 @@ interface BudgetState {
   budgetLoading: boolean;
   budgetError: string | null;
   budgetPeriod: string;
-  collapsedCategories: Set<string>;
+  collapsedGroups: Set<string>;
+  expandedCategories: Set<string>;
 
   // Accounts
   accounts: Account[];
@@ -64,7 +65,8 @@ interface BudgetState {
 
   fetchBudget: (period?: string) => Promise<void>;
   navigateBudgetPeriod: (direction: 'prev' | 'next') => void;
-  toggleCategoryCollapse: (categoryId: string) => void;
+  toggleGroupCollapse: (group: string) => void;
+  toggleCategoryExpand: (categoryId: string) => void;
   updateBudgetTarget: (categoryId: string, amount: number) => Promise<void>;
   createLineItem: (categoryId: string, name: string) => Promise<void>;
   updateLineItem: (id: string, data: Partial<BudgetLineItem>) => Promise<void>;
@@ -103,7 +105,8 @@ export const useStore = create<BudgetState>((set, get) => ({
   budgetLoading: false,
   budgetError: null,
   budgetPeriod: currentMonth(),
-  collapsedCategories: new Set(),
+  collapsedGroups: new Set(['Essentials', 'Daily Living', 'Family & Home', 'Leisure', 'Financial']),
+  expandedCategories: new Set(),
 
   accounts: [],
   accountsLoading: false,
@@ -187,12 +190,21 @@ export const useStore = create<BudgetState>((set, get) => ({
     get().fetchBudget(newPeriod);
   },
 
-  toggleCategoryCollapse: (categoryId) => {
+  toggleGroupCollapse: (group) => {
     set((state) => {
-      const next = new Set(state.collapsedCategories);
+      const next = new Set(state.collapsedGroups);
+      if (next.has(group)) next.delete(group);
+      else next.add(group);
+      return { collapsedGroups: next };
+    });
+  },
+
+  toggleCategoryExpand: (categoryId) => {
+    set((state) => {
+      const next = new Set(state.expandedCategories);
       if (next.has(categoryId)) next.delete(categoryId);
       else next.add(categoryId);
-      return { collapsedCategories: next };
+      return { expandedCategories: next };
     });
   },
 
