@@ -66,6 +66,38 @@ export async function syncUserTransactions(userId: string): Promise<SyncResult> 
     console.log(`Fixed ${batchCount} orphaned transactions`);
   }
 
+  // Repair is_income and amount for existing transactions
+  // Old logic used amount sign (unreliable across institutions).
+  // New logic uses personal_finance_category which Plaid provides reliably.
+  const allTxnSnap = await db.collection('users').doc(userId).collection('transactions').get();
+  if (!allTxnSnap.empty) {
+    const repairBatch = db.batch();
+    let repairCount = 0;
+
+    for (const txnDoc of allTxnSnap.docs) {
+      const txn = txnDoc.data();
+      const plaidCat = txn.plaid_category;
+      const primaryCat = (Array.isArray(plaidCat) ? (plaidCat[0] || '') : '').toUpperCase();
+      const correctIsIncome = primaryCat === 'INCOME' || primaryCat === 'TRANSFER_IN';
+      const correctAmount = Math.round(Math.abs(txn.amount));
+
+      // Only update if something changed
+      if (txn.is_income !== correctIsIncome || txn.amount !== correctAmount) {
+        repairBatch.update(txnDoc.ref, {
+          is_income: correctIsIncome,
+          amount: correctAmount,
+        });
+        repairCount++;
+        if (repairCount >= 499) break;
+      }
+    }
+
+    if (repairCount > 0) {
+      await repairBatch.commit();
+      console.log(`Repaired is_income/amount on ${repairCount} transactions`);
+    }
+  }
+
   for (const [itemId, itemData] of Object.entries(settings.plaid_items as Record<string, any>)) {
     try {
       const accessToken = decrypt(itemData.access_token);
@@ -77,8 +109,11 @@ export async function syncUserTransactions(userId: string): Promise<SyncResult> 
       // Process added transactions
       for (const txn of result.added) {
         const displayMerchant = normalizeMerchant(txn.merchant_name || txn.name);
-        const isIncome = txn.amount < 0; // Plaid: negative = money in
-        const amountCents = Math.round(txn.amount * 100);
+        // Determine income from Plaid category (amount sign is unreliable across institutions)
+        const primaryCategory = (txn.personal_finance_category?.[0] || '').toUpperCase();
+        const isIncome = primaryCategory === 'INCOME'
+          || primaryCategory === 'TRANSFER_IN';
+        const amountCents = Math.round(Math.abs(txn.amount) * 100);
 
         const catResult = await categorizeTransaction(
           userId,
@@ -114,7 +149,7 @@ export async function syncUserTransactions(userId: string): Promise<SyncResult> 
 
       // Process modified transactions
       for (const txn of result.modified) {
-        const amountCents = Math.round(txn.amount * 100);
+        const amountCents = Math.round(Math.abs(txn.amount) * 100);
         await txnCollection.doc(txn.transaction_id).update({
           amount: amountCents,
           date: txn.date,

@@ -44,12 +44,23 @@ router.get('/', async (req: Request, res: Response) => {
     const targets = new Map(targetSnap.docs.map(d => [d.data().category_id, { id: d.id, ...d.data() }]));
 
     // Get line items for active categories
-    const itemSnap = await db
-      .collection('users').doc(userId).collection('budget_items')
-      .where('is_active', '==', true)
-      .orderBy('sort_order')
-      .get();
-    const allItems = itemSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+    // This query needs a composite index (is_active + sort_order).
+    // If index doesn't exist, return empty items — budget still works without them.
+    let allItems: any[] = [];
+    try {
+      const itemSnap = await db
+        .collection('users').doc(userId).collection('budget_items')
+        .where('is_active', '==', true)
+        .orderBy('sort_order')
+        .get();
+      allItems = itemSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+    } catch (err: any) {
+      if (err?.code === 9 || err?.message?.includes('index')) {
+        console.warn('Budget items query skipped — composite index not yet created');
+      } else {
+        throw err;
+      }
+    }
 
     // Get spending classifications for merchant badge display (M8)
     const classSnap = await db
