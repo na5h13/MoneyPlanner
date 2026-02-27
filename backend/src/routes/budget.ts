@@ -27,8 +27,9 @@ router.get('/', async (req: Request, res: Response) => {
     const userId = req.uid;
     const period = (req.query.period as string) || currentPeriod();
     const [year, month] = period.split('-').map(Number);
+    console.log(`GET /budget — period=${period} year=${year} month=${month}`);
 
-    // Get categories (seeds defaults if none exist)
+    // Get categories (seeds defaults if none exist, migrates missing group field)
     await ensureCategories(userId);
     const catSnap = await db
       .collection('users').doc(userId).collection('categories')
@@ -90,6 +91,7 @@ router.get('/', async (req: Request, res: Response) => {
       .where('date', '<', endDate)
       .get();
     const transactions = txnSnap.docs.map(d => d.data());
+    console.log(`GET /budget — date range [${startDate}, ${endDate}) → ${transactions.length} transactions`);
 
     // Compute spending per category (cents)
     const ONE_TIME_THRESHOLD = 20000; // $200 in cents
@@ -299,6 +301,7 @@ router.get('/', async (req: Request, res: Response) => {
       safe_to_spend: totalIncome - totalCommitted,
     };
 
+    console.log(`GET /budget — ${categories.length} categories, ${transactions.length} txns in ${period}, income=${totalIncome} committed=${totalCommitted}`);
     res.json({ data: budgetDisplay, summary });
   } catch (err) {
     console.error('GET /budget error:', err);

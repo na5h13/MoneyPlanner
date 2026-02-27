@@ -57,9 +57,25 @@ const DEFAULT_CATEGORIES = [
     includes: [] },
 ];
 
+// Build name → group lookup from DEFAULT_CATEGORIES for migration
+const NAME_TO_GROUP: Record<string, string> = {};
+for (const cat of DEFAULT_CATEGORIES) {
+  NAME_TO_GROUP[cat.name] = cat.group;
+}
+
+// Also map OLD category names (pre-19-category) to reasonable groups
+const LEGACY_NAME_TO_GROUP: Record<string, string> = {
+  'Home & Personal': 'Essentials',
+  'Food & Transportation': 'Daily Living',
+  'Family': 'Family & Home',
+  'Loans & Debt': 'Financial',
+  'Entertainment & Other': 'Leisure',
+};
+
 /**
  * Seeds default categories if the user has none.
- * Returns the categories array (seeded or existing).
+ * Migrates existing categories that are missing the `group` field.
+ * Returns the categories array (seeded, migrated, or existing).
  */
 export async function ensureCategories(userId: string): Promise<Array<{
   id: string;
@@ -71,9 +87,26 @@ export async function ensureCategories(userId: string): Promise<Array<{
 
   const snap = await catCollection.limit(1).get();
   if (!snap.empty) {
-    // Already has categories — return them
+    // Already has categories — check if migration needed
     const allSnap = await catCollection.orderBy('sort_order').get();
-    return allSnap.docs.map(d => ({ id: d.id, ...d.data() } as any));
+    const docs = allSnap.docs;
+
+    // Migrate: add `group` field to any category missing it
+    const needsMigration = docs.filter(d => !d.data().group);
+    if (needsMigration.length > 0) {
+      const batch = db.batch();
+      for (const doc of needsMigration) {
+        const name = doc.data().name;
+        const group = NAME_TO_GROUP[name] || LEGACY_NAME_TO_GROUP[name] || 'Uncategorized';
+        batch.update(doc.ref, { group, updated_at: new Date().toISOString() });
+      }
+      await batch.commit();
+      // Re-read after migration
+      const freshSnap = await catCollection.orderBy('sort_order').get();
+      return freshSnap.docs.map(d => ({ id: d.id, ...d.data() } as any));
+    }
+
+    return docs.map(d => ({ id: d.id, ...d.data() } as any));
   }
 
   // Seed defaults

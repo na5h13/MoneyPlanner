@@ -25,7 +25,7 @@ function groupBudgetData(budgetDisplay: BudgetCategoryDisplay[]): { groups: Grou
   for (const cat of budgetDisplay) {
     if (cat.category.is_income) continue;
 
-    const group = (cat.category as any).group as CategoryGroup | undefined;
+    const group = cat.category.group as CategoryGroup | undefined;
 
     if (!group || group === 'Uncategorized') {
       if (cat.category.name === 'Uncategorized') uncategorized = cat;

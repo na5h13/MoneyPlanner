@@ -39,7 +39,7 @@ router.get('/', async (req: Request, res: Response) => {
 router.post('/', async (req: Request, res: Response) => {
   try {
     const db = getFirestore();
-    const { name, icon, includes } = req.body;
+    const { name, icon, includes, group } = req.body;
 
     if (!name) {
       res.status(400).json({ error: 'name is required' });
@@ -62,6 +62,7 @@ router.post('/', async (req: Request, res: Response) => {
       user_id: req.uid,
       name,
       icon: icon || 'custom',
+      group: group || 'Uncategorized',
       sort_order: maxOrder + 1,
       is_default: false,
       is_income: false,
@@ -93,6 +94,7 @@ router.put('/:id', async (req: Request, res: Response) => {
     const updates: Record<string, any> = { updated_at: new Date().toISOString() };
     if (req.body.name !== undefined) updates.name = req.body.name;
     if (req.body.icon !== undefined) updates.icon = req.body.icon;
+    if (req.body.group !== undefined) updates.group = req.body.group;
     if (req.body.includes !== undefined) updates.includes = req.body.includes;
 
     await ref.update(updates);
