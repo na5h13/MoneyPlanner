@@ -2,6 +2,7 @@
 // Supports: base64 env var, JSON string env var, file path, DEV_MODE fallback
 
 import admin from 'firebase-admin';
+import { getFirestore as getFirestoreDb } from 'firebase-admin/firestore';
 import path from 'path';
 import fs from 'fs';
 
@@ -61,7 +62,7 @@ export function getFirestore(): admin.firestore.Firestore {
   if (!initialized) initFirebase();
   const dbName = process.env.FIRESTORE_DATABASE_ID;
   if (dbName) {
-    return admin.app().firestore(dbName);
+    return getFirestoreDb(admin.app(), dbName);
   }
   return admin.firestore();
 }
