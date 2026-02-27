@@ -121,15 +121,40 @@ router.get('/', async (req: Request, res: Response) => {
     const daysElapsed = Math.max(today, 1);
 
     // Build spending-by-merchant map for per-item trending
+    // Also group by category+merchant for auto-generating line items
     const spentByMerchant = new Map<string, number>();
-    const merchantPosted = new Map<string, boolean>(); // has posted (non-pending) txn this month
+    const merchantPosted = new Map<string, boolean>();
+    // category_id → Map<merchant_display_name, { amount, merchant_key, posted }>
+    const merchantsByCategory = new Map<string, Map<string, { amount: number; merchantKey: string; posted: boolean; displayName: string }>>();
     for (const txn of transactions) {
       if (txn.is_income) continue;
-      const merchant = (txn.merchant_name || txn.name || '').toLowerCase().trim();
-      if (!merchant) continue;
-      spentByMerchant.set(merchant, (spentByMerchant.get(merchant) || 0) + Math.abs(txn.amount));
+      const merchantKey = (txn.merchant_name || txn.name || '').toLowerCase().trim();
+      if (!merchantKey) continue;
+      const amt = Math.abs(txn.amount);
+      const catId = txn.category_id || 'uncategorized';
+      const displayName = txn.display_merchant || txn.merchant_name || txn.name || 'Unknown';
+
+      spentByMerchant.set(merchantKey, (spentByMerchant.get(merchantKey) || 0) + amt);
       if (!txn.pending) {
-        merchantPosted.set(merchant, true);
+        merchantPosted.set(merchantKey, true);
+      }
+
+      // Group by category for auto-generated line items
+      if (!merchantsByCategory.has(catId)) {
+        merchantsByCategory.set(catId, new Map());
+      }
+      const catMerchants = merchantsByCategory.get(catId)!;
+      const existing = catMerchants.get(merchantKey);
+      if (existing) {
+        existing.amount += amt;
+        if (!txn.pending) existing.posted = true;
+      } else {
+        catMerchants.set(merchantKey, {
+          amount: amt,
+          merchantKey,
+          posted: !txn.pending,
+          displayName,
+        });
       }
     }
 
@@ -142,66 +167,92 @@ router.get('/', async (req: Request, res: Response) => {
       }
     }
 
+    // Helper: compute per-item trending for a given merchant
+    function computeItemTrending(merchantKey: string, classType: string | null, budgetAmount: number) {
+      const merchantSpent = spentByMerchant.get(merchantKey) || 0;
+      const posted = merchantPosted.get(merchantKey) || false;
+      const classDetail = classificationDetails.get(merchantKey);
+
+      let trendingAmount = 0;
+      let itemStatus: 'ok' | 'watch' | 'over' = 'ok';
+
+      if (classType === 'FIXED') {
+        trendingAmount = posted ? merchantSpent : (classDetail?.expected_amount || budgetAmount || 0);
+      } else if (classType === 'RECURRING_VARIABLE') {
+        if (posted) {
+          trendingAmount = merchantSpent;
+        } else if (classDetail?.amount_range_low != null && classDetail?.amount_range_high != null) {
+          trendingAmount = Math.round((classDetail.amount_range_low + classDetail.amount_range_high) / 2);
+        } else {
+          trendingAmount = budgetAmount || 0;
+        }
+      } else {
+        if (merchantSpent > 0 && daysElapsed >= 3) {
+          trendingAmount = Math.round((merchantSpent / daysElapsed) * daysInMonth);
+        } else {
+          trendingAmount = merchantSpent || 0;
+        }
+      }
+
+      if (budgetAmount > 0 && trendingAmount > 0) {
+        if (trendingAmount > budgetAmount * 1.10) {
+          itemStatus = 'over';
+        } else if (trendingAmount > budgetAmount) {
+          itemStatus = 'watch';
+        }
+      }
+
+      return { posted, amount: trendingAmount, status: itemStatus };
+    }
+
     // Build display data
     const budgetDisplay = categories.map((cat: any) => {
       const target = targets.get(cat.id) as any;
-      const items = allItems
-        .filter((item: any) => item.category_id === cat.id)
-        .map((item: any) => {
+      const manualItems = allItems.filter((item: any) => item.category_id === cat.id);
+
+      let items: any[];
+      if (manualItems.length > 0) {
+        // Use manually-created budget items
+        items = manualItems.map((item: any) => {
           const classType = item.linked_merchant
             ? (classificationByMerchant.get(item.linked_merchant) || null)
             : null;
-
-          // Compute per-item trending
-          let item_trending = null;
-          if (item.linked_merchant) {
-            const merchantKey = item.linked_merchant.toLowerCase().trim();
-            const merchantSpent = spentByMerchant.get(merchantKey) || 0;
-            const posted = merchantPosted.get(merchantKey) || false;
-            const classDetail = classificationDetails.get(item.linked_merchant);
-
-            let trendingAmount = 0;
-            let itemStatus: 'ok' | 'watch' | 'over' = 'ok';
-
-            if (classType === 'FIXED') {
-              // FIXED: show actual if posted, else expected
-              trendingAmount = posted ? merchantSpent : (classDetail?.expected_amount || item.budget_amount || 0);
-            } else if (classType === 'RECURRING_VARIABLE') {
-              // RECURRING_VARIABLE: midpoint of range if not posted, actual if posted
-              if (posted) {
-                trendingAmount = merchantSpent;
-              } else if (classDetail?.amount_range_low != null && classDetail?.amount_range_high != null) {
-                trendingAmount = Math.round((classDetail.amount_range_low + classDetail.amount_range_high) / 2);
-              } else {
-                trendingAmount = item.budget_amount || 0;
-              }
-            } else {
-              // TRUE_VARIABLE or unclassified: daily run-rate
-              if (merchantSpent > 0 && daysElapsed >= 3) {
-                trendingAmount = Math.round((merchantSpent / daysElapsed) * daysInMonth);
-              } else {
-                trendingAmount = merchantSpent || 0;
-              }
-            }
-
-            // Per-item status: compare trending to budget
-            if (item.budget_amount > 0 && trendingAmount > 0) {
-              if (trendingAmount > item.budget_amount * 1.10) {
-                itemStatus = 'over';
-              } else if (trendingAmount > item.budget_amount) {
-                itemStatus = 'watch';
-              }
-            }
-
-            item_trending = { posted, amount: trendingAmount, status: itemStatus };
-          }
-
-          return {
-            ...item,
-            classification_type: classType,
-            item_trending,
-          };
+          const merchantKey = item.linked_merchant ? item.linked_merchant.toLowerCase().trim() : '';
+          const item_trending = item.linked_merchant
+            ? computeItemTrending(merchantKey, classType, item.budget_amount)
+            : null;
+          return { ...item, classification_type: classType, item_trending };
         });
+      } else {
+        // Auto-generate line items from transactions grouped by merchant
+        const catMerchants = merchantsByCategory.get(cat.id);
+        if (catMerchants && catMerchants.size > 0) {
+          let sortIdx = 0;
+          items = Array.from(catMerchants.values())
+            .sort((a, b) => b.amount - a.amount) // highest spend first
+            .map((m) => {
+              const classType = classificationByMerchant.get(m.merchantKey) || null;
+              const item_trending = computeItemTrending(m.merchantKey, classType, m.amount);
+              return {
+                id: `auto_${cat.id}_${sortIdx}`,
+                user_id: userId,
+                category_id: cat.id,
+                display_name: m.displayName,
+                linked_merchant: m.merchantKey,
+                budget_amount: m.amount, // actual spend as budget reference
+                source: 'auto',
+                is_active: true,
+                renamed_by_user: false,
+                sort_order: sortIdx++,
+                classification_type: classType,
+                item_trending,
+              };
+            });
+        } else {
+          items = [];
+        }
+      }
+
       const spent = spentByCategory.get(cat.id) || 0;
       const targetAmount = target?.target_amount || 0;
 
