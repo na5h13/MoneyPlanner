@@ -56,6 +56,53 @@ app.get('/health', async (_req, res) => {
   });
 });
 
+// TEMPORARY: Migrate bad flat "plaid_items.XXX" keys to nested plaid_items object
+app.post('/debug/migrate', async (_req, res) => {
+  try {
+    const db = getFirestore();
+    const usersSnap = await db.collection('users').get();
+    const results: any[] = [];
+
+    for (const userDoc of usersSnap.docs) {
+      const data = userDoc.data();
+      const flatKeys = Object.keys(data).filter(k => k.startsWith('plaid_items.'));
+
+      if (flatKeys.length === 0) {
+        results.push({ userId: userDoc.id, status: 'no flat keys found' });
+        continue;
+      }
+
+      // Build proper nested plaid_items from flat keys
+      const nestedItems: Record<string, any> = data.plaid_items || {};
+      const deleteFields: Record<string, any> = {};
+
+      for (const flatKey of flatKeys) {
+        const itemId = flatKey.replace('plaid_items.', '');
+        nestedItems[itemId] = data[flatKey];
+        // Mark flat key for deletion using FieldValue.delete()
+        deleteFields[flatKey] = require('firebase-admin').firestore.FieldValue.delete();
+      }
+
+      // Write nested structure + delete flat keys
+      await userDoc.ref.update({
+        plaid_items: nestedItems,
+        ...deleteFields,
+      });
+
+      results.push({
+        userId: userDoc.id,
+        status: 'migrated',
+        migratedKeys: flatKeys,
+        itemCount: Object.keys(nestedItems).length,
+      });
+    }
+
+    res.json({ results });
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message, stack: err?.stack?.split('\n').slice(0, 3) });
+  }
+});
+
 // TEMPORARY DEBUG — traces accounts pipeline step by step (remove after fixing)
 app.get('/debug/accounts', async (_req, res) => {
   const steps: any[] = [];

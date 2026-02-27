@@ -166,7 +166,12 @@ router.post('/exchange', async (req: Request, res: Response) => {
 
     console.log('  Step 3: Writing to Firestore...', { institutionName, institutionId });
     try {
-      await db.collection('users').doc(req.uid).set({
+      const userRef = db.collection('users').doc(req.uid);
+      // Ensure user doc exists (update() fails on missing docs)
+      await userRef.set({}, { merge: true });
+      // update() interprets dot-notation as nested paths
+      // (set() treats them as literal field names — causes the bug)
+      await userRef.update({
         [`plaid_items.${result.item_id}`]: {
           access_token: encryptedToken,
           institution_name: institutionName,
@@ -175,7 +180,7 @@ router.post('/exchange', async (req: Request, res: Response) => {
           cursor: '',
           last_sync: null,
         },
-      }, { merge: true });
+      });
       console.log('  Step 3a OK: User doc updated');
     } catch (fsErr: any) {
       console.error('  Step 3a FAILED (Firestore user doc):', fsErr?.message);
