@@ -289,6 +289,54 @@
 - (+) .env.example prevents guessing which values to use
 - (-) Must register web app in Firebase Console before web auth works
 
+### ADR-019: Express Serves Web SPA (Single Railway Deploy)
+
+**Date:** 2026-02-27
+**Status:** Accepted (supersedes separate web hosting approach)
+**Context:** Web app changes were never deployed because the SPA had no hosting pipeline. Railway only deployed the Express backend. User reported "changes not taking effect" after pushing.
+**Decision:** Express backend serves the Vite-built SPA: `express.static(web/dist)` for assets, SPA fallback (`res.sendFile('index.html')`) for React Router client-side routes. `railway.json` builds both backend + web in sequence. Deploy workflow triggers on `backend/**` OR `web/**` changes.
+**Alternatives Considered:**
+- Separate Netlify/Vercel deployment for web — adds second deploy target, CORS complexity, separate domain
+- Serve from S3/CloudFront — over-engineering for a dashboard app
+- Keep web as local-only dev — user explicitly wants deployed web
+**Consequences:**
+- (+) One push → one deploy → both API and SPA go live
+- (+) Same-origin API calls — no CORS issues in production
+- (+) Simple — no additional hosting service to manage
+- (-) Slightly larger Railway build (web npm install + vite build adds ~30s)
+- (-) Helmet CSP disabled (Vite uses inline scripts) — acceptable for internal tool
+
+### ADR-020: Firebase Web Config Hardcoded as Fallback
+
+**Date:** 2026-02-27
+**Status:** Accepted
+**Context:** `web/.env` is gitignored (correctly). Railway builds don't have the Firebase config env vars unless manually set in Railway dashboard. Without Firebase config, the web app can't authenticate.
+**Decision:** Public Firebase web client config is hardcoded in `web/src/firebase-config.ts`. `auth.ts` uses env vars as override, falls back to hardcoded values. Firebase web API keys are PUBLIC by design — they're in every page load. Security is enforced by Firebase Security Rules.
+**Alternatives Considered:**
+- Set VITE_FIREBASE_* in Railway env vars — requires manual dashboard config per deploy
+- Backend `/config` endpoint — adds network round-trip before app init
+- Commit web/.env — gitignore exists for good reason (other env files have actual secrets)
+**Consequences:**
+- (+) Zero-config Railway deploy — no env vars needed for Firebase auth
+- (+) Env vars still override for local dev flexibility
+- (-) Config changes require code change + redeploy (rare — Firebase project doesn't change)
+
+### ADR-021: 19 Hierarchical Categories with Group Field + Migration
+
+**Date:** 2026-02-27
+**Status:** Accepted (supersedes flat 6-category system)
+**Context:** Original system had 6 broad categories (Income, Home & Personal, Food & Transportation, Family, Entertainment & Other, Uncategorized). Too coarse for meaningful budget tracking. Web budget screen needed hierarchical drill-down.
+**Decision:** 19 granular categories organized into 7 groups: Income, Essentials (4), Daily Living (5), Family & Home (2), Leisure (3), Financial (3), Uncategorized. `group` field added as `CategoryGroup` union type. `ensureCategories()` both seeds new users AND migrates existing users' categories missing `group` field. Web Budget screen renders: Group → Category → Line Items waterfall.
+**Alternatives Considered:**
+- Keep 6 broad categories — too coarse, can't distinguish Groceries from Insurance
+- Let users create their own hierarchy — over-engineering, most users want defaults
+- Store groups as separate Firestore collection — adds complexity, group is a category attribute
+**Consequences:**
+- (+) Budget drill-down UI: 5 collapsible groups → categories → line items
+- (+) Auto-migration ensures existing Firestore data gets the new field
+- (+) Legacy category names mapped to reasonable groups
+- (-) Migration runs on every `ensureCategories()` call until all categories are migrated (one-time cost)
+
 ---
 
 ## Rejected Approaches
@@ -308,3 +356,6 @@
 | Phone-width column for web layout | Wastes 80% of desktop screen, bad UX, user explicitly rejected | 2026-02-27 |
 | Silent API error handling | Users can't distinguish empty data from broken API → appears broken | 2026-02-27 |
 | Android Firebase API key for web | Different key per platform — web key from Firebase Console, not google-services.json | 2026-02-27 |
+| Separate web hosting (Netlify/Vercel) | Adds second deploy target, CORS complexity. Express serves SPA instead | 2026-02-27 |
+| Firebase config via Railway env vars only | Requires manual dashboard config. Hardcoded fallback is simpler | 2026-02-27 |
+| Flat 6-category system | Too coarse for meaningful budgeting. 19 categories in 7 groups provides drill-down | 2026-02-27 |

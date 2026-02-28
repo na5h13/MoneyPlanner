@@ -55,7 +55,7 @@
 | **Web Fonts** | Google Fonts via `<link>` in index.html |
 | **Web Auth** | Firebase JS SDK (`firebase/auth`) — Google Sign-In popup |
 | **Web Layout** | Desktop sidebar (220px) + mobile bottom nav (<768px) |
-| **Web Deploy** | Static build (`npm run build` → `dist/`) — any static host |
+| **Web Deploy** | Express serves `web/dist/` — single Railway deploy for API + SPA |
 
 ## Project Structure
 
@@ -122,6 +122,7 @@ MoneyPlanner/
 │   │   ├── theme.css                 # All CSS: design tokens, glassmorphism, layout, responsive
 │   │   ├── types.ts                  # Shared interfaces (copied from mobile src/types/index.ts)
 │   │   ├── auth.ts                   # Firebase JS Auth — LAZY init (see Lessons Learned)
+│   │   ├── firebase-config.ts        # Public Firebase web client config (hardcoded fallback)
 │   │   ├── api.ts                    # HTTP client + Firebase token injection + formatAmount utils
 │   │   ├── store.ts                  # Zustand store (budget, transactions, settings, error states)
 │   │   ├── components/
@@ -141,7 +142,8 @@ MoneyPlanner/
 │   └── fix-plaid-esm.js             # Postinstall: patch Plaid SDK ESM imports
 ├── assets/                           # App icons (placeholder PNGs)
 ├── .github/workflows/
-│   └── build-android.yml             # GitHub Actions APK build
+│   ├── build-android.yml             # GitHub Actions APK build
+│   └── deploy-backend.yml            # Railway deploy (backend + web) — triggers on backend/** or web/**
 ├── app.json                          # Expo config
 ├── tsconfig.json
 ├── package.json
@@ -194,7 +196,7 @@ MoneyPlanner/
 - Color redundancy always (color + icon + label)
 
 ### Web App (Vite/React)
-- **Standalone SPA** — NOT Expo Web. Separate `web/` directory, own `package.json`, own `node_modules`
+- **Standalone SPA served by Express** — NOT Expo Web. Separate `web/` directory, own `package.json`, own `node_modules`. Express serves `web/dist/` as static files + SPA fallback for React Router
 - **Desktop-first** responsive layout: sidebar nav (220px) on desktop, bottom tab bar on mobile (<768px)
 - **CSS glassmorphism** — `backdrop-filter: blur(24px) saturate(1.4)`, NOT expo-blur
 - **Firebase JS SDK** (not RN Firebase) — `firebase/auth` with Google Sign-In popup
@@ -205,15 +207,18 @@ MoneyPlanner/
 - **Google Fonts** loaded via `<link>` in `index.html` (Playfair Display, Source Code Pro, Source Sans 3)
 - **Environment variables** — `VITE_*` prefix required for Vite to expose them to client code
 - **DEV_MODE** — `VITE_DEV_MODE=true` bypasses Firebase auth on web (same as mobile EXPO_PUBLIC_DEV_MODE)
-- **Production API** — web/.env must point to Railway URL: `VITE_API_BASE_URL=https://web-production-794b4.up.railway.app`
-- **Firebase web config** differs from Android — web API key is `AIzaSyDxBuR6u9BB77C2fWHADBA6KC7CtvPoMIg`, NOT the Android key. Web app ID: `1:230366313824:web:47b3e3a77bb8090249b205`. See web/.env.example
+- **Production API** — same origin (Express serves both API + SPA). For local dev, `web/.env` points to Railway: `VITE_API_BASE_URL=https://web-production-794b4.up.railway.app`
+- **Firebase web config** — hardcoded in `web/src/firebase-config.ts` as fallback (public client keys). Env vars override if present. Web API key: `AIzaSyDxBuR6u9BB77C2fWHADBA6KC7CtvPoMIg`, NOT the Android key
+- **API_BASE_URL logic** — `envUrl !== undefined ? envUrl : 'http://localhost:5050'`. In production build, `VITE_API_BASE_URL=""` → same origin. Not set → localhost fallback for local dev
 
 ### Backend (Express/TypeScript)
 - Firebase Auth middleware (DEV_MODE falls back to user-1)
 - Plaid cursor-based sync (iterates has_more loop)
 - AES-256-GCM encryption for Plaid access tokens
 - 4-priority categorization: merchant rule → historical → Plaid map → keyword → Uncategorized
-- `ensureCategories()` shared service — seeds defaults before budget, sync, or category reads
+- `ensureCategories()` shared service — seeds defaults before budget, sync, or category reads; **also migrates** existing categories missing the `group` field
+- 19 default categories in 7 hierarchical groups: Income, Essentials, Daily Living, Family & Home, Leisure, Financial, Uncategorized
+- **Serves web SPA** — `express.static(web/dist)` + SPA fallback for React Router. Helmet CSP disabled for Vite inline scripts
 - Firestore: use `.update()` for dot-notation nested paths, NOT `.set()` (creates flat keys)
 - All routes under `/api/v1/`
 
@@ -265,7 +270,8 @@ CORS on Railway is `ALLOWED_ORIGINS=*` — supports both localhost dev and any d
 - Do NOT design web layouts mobile-first with fixed 430px width — desktop-first with responsive breakpoint
 - Do NOT silently swallow API errors — surface them with ErrorBanner + retry on every page
 - Do NOT use expo-blur or any RN-only packages in web/ — pure CSS + standard npm packages only
-- Do NOT hardcode localhost API URLs for web — use VITE_API_BASE_URL env var pointing to Railway production
+- Do NOT hardcode API URLs in web code — production uses same-origin (VITE_API_BASE_URL=""), local dev uses .env with Railway URL
+- Do NOT make changes piecewise — when updating a data model (e.g. adding `group` to categories), propagate to ALL files: types, backend routes, ensureCategories, frontend store, UI components
 
 ## Living Documents
 
@@ -307,5 +313,7 @@ VITE_FIREBASE_APP_ID=1:230366313824:web:47b3e3a77bb8090249b205
 - **Mobile Build:** GitHub Actions → `expo prebuild` → `./gradlew assembleRelease` → APK artifact
 - **Signing:** CI generates ephemeral keystore, patches Expo-generated build.gradle
 - **Secrets:** google-services.json, .env vars via GitHub Secrets
-- **Backend Deploy:** Push to main → Railway auto-deploys (railway.json: `cd backend && npm run start`)
-- **Web Deploy:** `cd web && npm run build` → deploy `dist/` to any static host (Netlify, Vercel, etc.)
+- **Railway Deploy:** Push to main (backend/** or web/**) → GitHub Actions `railway up` → builds both backend + web → single service serves API + SPA
+  - Build: `cd backend && npm install && npm run build && cd ../web && npm install && VITE_API_BASE_URL= npm run build`
+  - Start: `cd backend && node dist/index.js`
+  - Express serves `web/dist/` static files + SPA fallback

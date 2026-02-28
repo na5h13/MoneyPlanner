@@ -233,6 +233,30 @@ function getFirebaseAuth(): Auth {
 **Solution:** All web env vars use `VITE_` prefix: `VITE_API_BASE_URL`, `VITE_FIREBASE_API_KEY`, etc.
 **Rule:** Vite requires `VITE_` prefix. Expo requires `EXPO_PUBLIC_` prefix. Both are security measures. Never expect unprefixed env vars to work in client code.
 
+### 2026-02-27 — Web App Had No Deployment Pipeline (Changes Never Went Live)
+
+**Context:** Made code changes to web Budget screen (grouping, progress bars, month filtering), pushed to main, waited for Railway deploy.
+**Problem:** User reported "changes are not taking effect" despite Railway deploying 27 minutes ago.
+**Root Cause:** The web app had NO deployment pipeline at all. Railway only deployed the Express backend. The web SPA (`web/`) existed only in local dev — pushing code never deployed it anywhere. The backend did NOT serve the web's static files.
+**Solution:** Made Express serve the web SPA: `express.static(web/dist)` + SPA fallback for React Router. Updated `railway.json` to build both backend + web. Updated deploy workflow to trigger on `web/**` changes. Set `VITE_API_BASE_URL=""` at build time for same-origin API calls.
+**Rule:** When adding a web frontend to a backend project, ensure it has a deployment pipeline from day one. Serving the SPA from the API server is the simplest path — one deploy for everything.
+
+### 2026-02-27 — ensureCategories Must MIGRATE Existing Data, Not Just Seed
+
+**Context:** Added `group` field to 19 default categories. `ensureCategories()` seeds defaults when user has NO categories.
+**Problem:** User already had categories in Firestore (from a previous seed). They lacked the new `group` field. Budget screen couldn't group categories properly.
+**Root Cause:** `ensureCategories()` only checked "do categories exist?" — if yes, returned them as-is. Never checked if existing categories were missing new fields.
+**Solution:** Added migration logic: detect categories missing `group`, batch-update them using `NAME_TO_GROUP` + `LEGACY_NAME_TO_GROUP` lookup maps. Re-reads after migration to return fresh data.
+**Rule:** When adding new fields to seeded data, ALWAYS add migration logic for existing data. "Seed if empty" is not enough — existing users need migration too.
+
+### 2026-02-27 — Piecewise Changes Miss File Propagation
+
+**Context:** Added `group` field to Category type and default categories data.
+**Problem:** User feedback: "ARE YOU DOING PIECEWISE WORK, ALL UPDATES SHOULD BE PROPAGATED TO ALL FILES." Changes to data model were not propagated to all consumers: Firestore migration, backend POST/PUT routes, frontend grouping UI.
+**Root Cause:** Changed the data model definition but didn't trace every consumer of that data. Backend routes still created categories without `group`. Existing Firestore docs lacked `group`.
+**Solution:** Traced every file that touches categories: types (mobile + web), ensureCategories (seed + migrate), categories routes (POST + PUT), budget route (ensureCategories call), Budget.tsx (grouping UI).
+**Rule:** When changing a data model, grep the entire codebase for the type/field name and update EVERY consumer. Use a checklist: types → backend routes → services → frontend store → UI components → migration.
+
 ### 2026-02-27 — Standalone Vite App vs Expo Web for RN Projects
 
 **Context:** Needed a web version of the Expo React Native budget tracker app.
@@ -279,6 +303,10 @@ function getFirebaseAuth(): Auth {
 | Vite env vars need VITE_ prefix | `import.meta.env.VITE_*` — unprefixed vars are NOT exposed to client code |
 | Expo Web with RN-native deps | Use standalone Vite app. Don't fight expo-blur/Plaid/RN Firebase compatibility |
 | Web Firebase config location | Root `.env` has EXPO_PUBLIC_FIREBASE_* values — these ARE the web config. Copy to web/.env as VITE_* |
+| Web app not deployed | Express must serve `web/dist/` — railway.json builds both. No separate web hosting needed |
+| ensureCategories only seeds, no migration | Must also check for missing fields on existing docs and batch-update them |
+| Piecewise data model changes | Grep codebase for type/field, update ALL: types, routes, services, store, UI, migration |
+| Firebase config hardcoded fallback | `web/src/firebase-config.ts` has public client keys — env vars override. No Railway env setup needed |
 
 ---
 
@@ -307,3 +335,7 @@ function getFirebaseAuth(): Auth {
 | Standalone Vite app for web | Clean separation from RN-native deps; share only types + patterns |
 | CSS custom properties for design tokens | All colors, fonts, glass effects in one `theme.css` — easy to sync with mobile theme |
 | .env.example in web/ | Documents all required config vars with placeholder values; prevents guessing |
+| Express serves web SPA | Single Railway deploy for API + SPA; `express.static()` + SPA fallback for React Router |
+| Firebase config hardcoded with env override | Public client keys in code for zero-config deploy; env vars override for local dev |
+| `VITE_API_BASE_URL=""` for same-origin | Production build uses empty string = relative URLs = same Express server. No CORS issues |
+| ensureCategories with migration | Seed defaults for new users + batch-migrate existing users' missing fields in one function |
