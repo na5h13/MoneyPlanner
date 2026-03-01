@@ -1,0 +1,73 @@
+{
+  "permissions": {
+    "allow": ["*"],
+    "deny": [
+      "Write(src/theme/tokens.ts)",
+      "Write(.eslintrc*)", "Write(.stylelintrc*)",
+      "Bash(rm -rf *)", "Bash(sudo *)",
+      "Bash(git push --force*)", "Bash(git push -f *)",
+      "Bash(git reset --hard*)", "Bash(git clean -fd*)"
+    ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [{
+          "type": "command",
+          "command": "python3 .claude/hooks/block-dangerous.py"
+        }]
+      },
+      {
+        "matcher": "Write|Edit|MultiEdit",
+        "hooks": [{
+          "type": "command",
+          "command": "bash .claude/hooks/keel-spec-guard.sh"
+        }]
+      },
+      {
+        "matcher": "UserPromptSubmit",
+        "hooks": [{
+          "type": "command",
+          "command": "bash .claude/hooks/keel-prompt-inject.sh"
+        }]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit|MultiEdit",
+        "hooks": [{
+          "type": "command",
+          "command": "bash .claude/hooks/keel-drift-tracker.sh"
+        }]
+      }
+    ],
+    "PreCompact": [
+      {
+        "matcher": "manual",
+        "hooks": [{
+          "type": "command",
+          "command": "bash .claude/hooks/keel-compact-guidance.sh manual"
+        }]
+      },
+      {
+        "matcher": "auto",
+        "hooks": [{
+          "type": "command",
+          "command": "bash .claude/hooks/keel-compact-guidance.sh auto"
+        }]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [{
+          "type": "command",
+          "command": "bash .claude/hooks/keel-on-stop.sh 2>/dev/null || true"
+        }]
+      }
+    ]
+  },
+  "env": {
+    "KEEL_INFERENCE_MODE": "anthropic"
+  }
+}
